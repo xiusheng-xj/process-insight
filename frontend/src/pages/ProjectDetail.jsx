@@ -7,6 +7,7 @@ import { useLock } from '../hooks/useLock';
 import { fetchMilestonePatterns, applyMilestonePattern } from '../api/projects';
 import EventFormModal from '../components/EventFormModal';
 import ApplyPatternModal from '../components/ApplyPatternModal';
+import ProjectInfoCard from '../components/ProjectInfoCard';
 import AlertBanner from '../components/AlertBanner';
 
 /* ── 定数 ── */
@@ -37,28 +38,6 @@ function DiffCell({ diffDays, planDate, actualDate }) {
     if (diffDays < 0)       return <span className="diff diff-early">{diffDays}日（前倒）</span>;
     if (diffDays === 0)     return <span className="diff diff-ontime">±0日</span>;
     return <span className="diff diff-late">+{diffDays}日</span>;
-}
-
-/* ── 案件情報カード サブ見出し ── */
-const SUB_LABEL_STYLE = {
-    fontSize: 11, fontWeight: 600, color: '#9ca3af', letterSpacing: '0.05em',
-    marginTop: 20, marginBottom: 8, paddingBottom: 4, borderBottom: '1px solid #f3f4f6',
-    textTransform: 'uppercase',
-};
-function SubLabel({ children }) {
-    return <div style={SUB_LABEL_STYLE}>{children}</div>;
-}
-
-function InfoVal({ label, value, mono = false }) {
-    const display = (value !== null && value !== undefined && value !== '') ? value : '—';
-    return (
-        <div className="info-item">
-            <div className="label">{label}</div>
-            <div className="value" style={mono ? { fontFamily: 'monospace' } : undefined}>
-                {display}
-            </div>
-        </div>
-    );
 }
 
 /* ── メインコンポーネント ── */
@@ -193,59 +172,11 @@ export default function ProjectDetail() {
             )}
 
             {/* ── 案件情報 ── */}
-            <div className="section">
-                <div className="section-header">
-                    <h2 className="section-title">案件情報</h2>
-                </div>
-
-                {/* ---- 基本情報 ---- */}
-                <SubLabel>基本情報</SubLabel>
-                <div className="info-grid">
-                    <InfoVal label="No" value={project.project_no} mono />
-                    <InfoVal label="パターン" value={project.pattern_no} />
-                    <InfoVal label="自部門担当者" value={null} />
-                    <InfoVal label="A部門担当者" value={null} />
-                    <InfoVal label="B部門担当者" value={null} />
-                    <InfoVal label="C部門担当者" value={null} />
-                </div>
-
-                {/* ---- 工程管理情報 ---- */}
-                <SubLabel>工程管理情報</SubLabel>
-                <div className="info-grid">
-                    <InfoVal label="初回登録日"
-                        value={new Date(project.created_at).toLocaleDateString('ja-JP')} />
-                    <InfoVal label="受注日" value={null} />
-                    <InfoVal label="価格 概算／確定" value={null} />
-                    <InfoVal label="要求納期" value={null} />
-                    <InfoVal label="回答納期" value={null} />
-                    <InfoVal label="納期調整状況" value={null} />
-                </div>
-
-                {/* ---- 案件情報 ---- */}
-                <SubLabel>案件情報</SubLabel>
-                <div className="info-grid">
-                    <InfoVal label="機種" value={project.machine_type} />
-                    <InfoVal label="案件名" value={project.project_name} />
-                    <InfoVal label="製品名" value={project.product_name} />
-                    <InfoVal label="数量" value={project.quantity} />
-                </div>
-                <div className="info-grid" style={{ marginTop: 12, gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))' }}>
-                    <InfoVal label="管理番号A" value={null} />
-                    <InfoVal label="管理番号B" value={null} />
-                    <InfoVal label="管理番号C" value={null} />
-                    <InfoVal label="管理番号D" value={null} />
-                    <InfoVal label="管理番号E" value={null} />
-                    <InfoVal label="管理番号F" value={null} />
-                </div>
-
-                {/* その他 */}
-                <div style={{ marginTop: 16 }}>
-                    <div className="label" style={{ display: 'block', marginBottom: 6 }}>その他</div>
-                    <div style={{ padding: '10px 14px', background: '#f9fafb', borderRadius: 6, fontSize: 13, color: project.comment ? '#374151' : '#9ca3af', lineHeight: 1.6, minHeight: 36 }}>
-                        {project.comment || '—'}
-                    </div>
-                </div>
-            </div>
+            <ProjectInfoCard
+                project={project}
+                patterns={patterns}
+                onSaved={reloadProject}
+            />
 
             {/* ── イベント一覧 ── */}
             <div className="section">

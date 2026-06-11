@@ -82,7 +82,14 @@ export default function ProjectDetail() {
         try {
             const result = await applyMilestonePattern(id, { pattern_id, base_date });
             console.log('[pattern-apply] 完了:', result);
-            setApplyResult({ generated: result.event_count, archived: result.archived_count });
+            setApplyResult({
+                generated:   result.event_count,
+                archived:    result.archived_count,
+                carried:     result.carried_count    ?? 0,
+                restored:    result.restored_count   ?? 0,
+                calculated:  result.calculated_count ?? 0,
+                removed:     result.removed_count    ?? 0,
+            });
             setPatternModal(false);
             reloadProject();
             reloadEvents();
@@ -227,7 +234,10 @@ export default function ProjectDetail() {
                         {applyResult && (
                             <div style={{ fontSize: 12, color: '#059669', marginTop: 3 }}>
                                 ✓ 適用完了 — {applyResult.generated} 件生成
-                                {applyResult.archived > 0 && `、${applyResult.archived} 件を archive に退避`}
+                                {applyResult.carried    > 0 && ` / ${applyResult.carried} 件引き継ぎ`}
+                                {applyResult.restored   > 0 && ` / ${applyResult.restored} 件復元`}
+                                {applyResult.calculated > 0 && ` / ${applyResult.calculated} 件新規計算`}
+                                {applyResult.removed    > 0 && ` / ${applyResult.removed} 件除外`}
                             </div>
                         )}
                     </div>

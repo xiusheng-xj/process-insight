@@ -50,3 +50,23 @@ export const updateProject = async (id, body) => {
 export const deleteProject = async (id) => {
     await client.delete(`/projects/${id}`);
 };
+
+/**
+ * マイルストーンパターン一覧取得
+ * @returns {{ id, pattern_code, pattern_name, event_count, milestone_count }[]}
+ */
+export const fetchMilestonePatterns = async () => {
+    const res = await client.get('/templates');
+    return res.data;
+};
+
+/**
+ * マイルストーンパターン適用
+ * @param {number} projectId
+ * @param {{ pattern_id: number, base_date: string }} body
+ * @returns {{ message, event_count, archived_count, applied_milestone_pattern_id, events }}
+ */
+export const applyMilestonePattern = async (projectId, { pattern_id, base_date }) => {
+    const res = await client.post(`/projects/${projectId}/apply-template`, { pattern_id, base_date });
+    return res.data;
+};

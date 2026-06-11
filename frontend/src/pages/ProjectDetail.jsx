@@ -1,10 +1,12 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useProject } from '../hooks/useProjects';
 import { useEvents, useEventMutations } from '../hooks/useEvents';
 import { useAlerts } from '../hooks/useAlerts';
 import { useLock } from '../hooks/useLock';
+import { fetchMilestonePatterns, applyMilestonePattern } from '../api/projects';
 import EventFormModal from '../components/EventFormModal';
+import ApplyPatternModal from '../components/ApplyPatternModal';
 import AlertBanner from '../components/AlertBanner';
 
 /* ── 定数 ── */
@@ -48,11 +50,25 @@ export default function ProjectDetail() {
     const [editMode, setEditMode] = useState(false);
     const [eventModal, setEventModal] = useState(null); // { mode:'create'|'edit', event? }
 
-    const { data: project, loading: pLoading, error: pError } = useProject(id);
+    const { data: project, loading: pLoading, error: pError, reload: reloadProject } = useProject(id);
     const { data: events,  loading: eLoading, error: eError, reload: reloadEvents } = useEvents(id);
     const { data: alerts,  reload: reloadAlerts, resolve: resolveAlert } = useAlerts(id, { is_resolved: false });
     const { locked, lockedBy, myLock, lockError, acquire, release } = useLock(id);
     const { create, update, remove, loading: eMutating, error: eMutError } = useEventMutations(id, reloadEvents);
+
+    /* ── マイルストーンパターン ── */
+    const [patterns, setPatterns]         = useState([]);
+    const [patternModal, setPatternModal] = useState(false);
+    const [applyLoading, setApplyLoading] = useState(false);
+    const [applyResult, setApplyResult]   = useState(null); // { generated, archived }
+
+    useEffect(() => {
+        fetchMilestonePatterns().then(setPatterns).catch(() => {});
+    }, []);
+
+    const appliedPatternName = patterns.find(
+        (p) => p.id === project?.applied_milestone_pattern_id
+    )?.pattern_name;
 
     /* ── 編集モード切替 ── */
     const handleEditToggle = useCallback(async () => {
@@ -64,6 +80,21 @@ export default function ProjectDetail() {
             if (ok) setEditMode(true);
         }
     }, [editMode, acquire, release]);
+
+    /* ── パターン適用 ── */
+    const handlePatternApply = useCallback(async ({ pattern_id, base_date }) => {
+        setApplyLoading(true);
+        try {
+            const result = await applyMilestonePattern(id, { pattern_id, base_date });
+            console.log('[pattern-apply] 完了:', result);
+            setApplyResult({ generated: result.event_count, archived: result.archived_count });
+            setPatternModal(false);
+            reloadProject();
+            reloadEvents();
+        } finally {
+            setApplyLoading(false);
+        }
+    }, [id, reloadProject, reloadEvents]);
 
     /* ── イベント保存 ── */
     const handleEventSubmit = useCallback(async (body) => {
@@ -178,23 +209,50 @@ export default function ProjectDetail() {
             {/* ── イベント一覧 ── */}
             <div className="section">
                 <div className="section-header">
-                    <h2 className="section-title">
-                        イベント一覧
-                        {events.length > 0 && (
-                            <span style={{ fontSize: 13, fontWeight: 400, color: '#6b7280', marginLeft: 8 }}>
-                                {events.length} 件
-                            </span>
+                    <div>
+                        <h2 className="section-title">
+                            イベント一覧
+                            {events.length > 0 && (
+                                <span style={{ fontSize: 13, fontWeight: 400, color: '#6b7280', marginLeft: 8 }}>
+                                    {events.length} 件
+                                </span>
+                            )}
+                        </h2>
+                        {/* 適用済みパターン表示 */}
+                        {appliedPatternName ? (
+                            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+                                適用済み: {appliedPatternName}
+                            </div>
+                        ) : (
+                            <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>
+                                パターン未適用
+                            </div>
                         )}
-                    </h2>
-                    {editMode && (
+                        {/* 適用完了メッセージ */}
+                        {applyResult && (
+                            <div style={{ fontSize: 12, color: '#059669', marginTop: 3 }}>
+                                ✓ 適用完了 — {applyResult.generated} 件生成
+                                {applyResult.archived > 0 && `、${applyResult.archived} 件を archive に退避`}
+                            </div>
+                        )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                         <button
-                            className="btn btn-primary btn-sm"
-                            onClick={() => setEventModal({ mode: 'create' })}
-                            disabled={eMutating}
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => { setApplyResult(null); setPatternModal(true); }}
                         >
-                            ＋ イベント追加
+                            パターン適用
                         </button>
-                    )}
+                        {editMode && (
+                            <button
+                                className="btn btn-primary btn-sm"
+                                onClick={() => setEventModal({ mode: 'create' })}
+                                disabled={eMutating}
+                            >
+                                ＋ イベント追加
+                            </button>
+                        )}
+                    </div>
                 </div>
 
                 {eMutError && (
@@ -306,6 +364,15 @@ export default function ProjectDetail() {
                     onClose={() => setEventModal(null)}
                     onSubmit={handleEventSubmit}
                     loading={eMutating}
+                />
+            )}
+            {patternModal && (
+                <ApplyPatternModal
+                    patterns={patterns}
+                    currentEventCount={events.length}
+                    onClose={() => setPatternModal(false)}
+                    onSubmit={handlePatternApply}
+                    loading={applyLoading}
                 />
             )}
         </div>

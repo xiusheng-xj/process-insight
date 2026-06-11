@@ -4,19 +4,19 @@ const db      = require('../db');
 
 /**
  * POST /api/projects/:id/apply-template
- * body: { template_id: number, base_date?: string (YYYY-MM-DD) }
+ * body: { pattern_id: number, base_date?: string (YYYY-MM-DD) }
  *
  * 処理順序:
  *   1. 案件存在確認
  *   2. 既存イベントを project_events_archive へ退避 → DELETE
  *      （実績データ消失を防ぐため、全行を退避してから物理削除する）
- *   3. テンプレート取得（sort_order 昇順）
+ *   3. milestone_pattern_events 取得（sort_order 昇順）
  *   4. 予定日計算
  *      - offset_base = 'project_start' → base_date + offset_days
  *      - offset_base = 'prev_event'    → 直前イベント予定日 + offset_days
  *        （最初のイベントは prev_event 指定でも project_start として扱う）
  *   5. project_events 一括 INSERT
- *   6. projects.applied_template_id 更新
+ *   6. projects.applied_milestone_pattern_id 更新
  *   7. 生成イベント一覧 + archived_count を返す
  */
 router.post('/', async (req, res, next) => {
@@ -25,12 +25,12 @@ router.post('/', async (req, res, next) => {
         await client.query('BEGIN');
 
         const projectId  = req.params.id;
-        const { template_id, base_date } = req.body;
+        const { pattern_id, base_date } = req.body;
 
         // ── 入力検証 ─────────────────────────────────────
-        if (!template_id) {
+        if (!pattern_id) {
             await client.query('ROLLBACK');
-            return res.status(400).json({ error: 'template_id は必須です。' });
+            return res.status(400).json({ error: 'pattern_id は必須です。' });
         }
 
         // ── 1. 案件存在確認 ───────────────────────────────
@@ -94,7 +94,7 @@ router.post('/', async (req, res, next) => {
             [projectId]
         );
 
-        // ── 3. テンプレートイベント取得（sort_order 昇順）──
+        // ── 3. パターンイベント取得（sort_order 昇順）──────
         const { rows: templateEvents } = await client.query(
             `SELECT
                 te.sort_order,
@@ -107,20 +107,20 @@ router.post('/', async (req, res, next) => {
                 m.event_name,
                 m.event_type,
                 m.owner_department
-             FROM template_events  te
-             JOIN event_master     m  ON m.id  = te.event_master_id
-             JOIN event_template   t  ON t.id  = te.template_id
-             WHERE te.template_id = $1
-               AND m.is_active    = TRUE
-               AND t.is_active    = TRUE
+             FROM milestone_pattern_events te
+             JOIN event_master             m ON m.id = te.event_master_id
+             JOIN milestone_pattern        t ON t.id = te.pattern_id
+             WHERE te.pattern_id = $1
+               AND m.is_active   = TRUE
+               AND t.is_active   = TRUE
              ORDER BY te.sort_order ASC`,
-            [template_id]
+            [pattern_id]
         );
 
         if (templateEvents.length === 0) {
             await client.query('ROLLBACK');
             return res.status(404).json({
-                error: 'テンプレートが見つからないか、有効な工程が登録されていません。',
+                error: 'マイルストーンパターンが見つからないか、有効な工程が登録されていません。',
             });
         }
 
@@ -182,22 +182,22 @@ router.post('/', async (req, res, next) => {
             prevPlanDate = planDate;
         }
 
-        // ── 6. applied_template_id 更新 ──────────────────
+        // ── 6. applied_milestone_pattern_id 更新 ─────────
         await client.query(
-            'UPDATE projects SET applied_template_id = $1 WHERE id = $2',
-            [template_id, projectId]
+            'UPDATE projects SET applied_milestone_pattern_id = $1 WHERE id = $2',
+            [pattern_id, projectId]
         );
 
         await client.query('COMMIT');
 
         res.status(201).json({
-            message:             `テンプレートを適用しました。${insertedEvents.length} 件のイベントを生成しました。`,
-            project_id:          Number(projectId),
-            applied_template_id: Number(template_id),
-            base_date:           toDateStr(baseDate),
-            event_count:         insertedEvents.length,
-            archived_count:      archivedCount,
-            events:              insertedEvents,
+            message:                       `パターンを適用しました。${insertedEvents.length} 件のイベントを生成しました。`,
+            project_id:                    Number(projectId),
+            applied_milestone_pattern_id:  Number(pattern_id),
+            base_date:                     toDateStr(baseDate),
+            event_count:                   insertedEvents.length,
+            archived_count:                archivedCount,
+            events:                        insertedEvents,
         });
 
     } catch (err) {

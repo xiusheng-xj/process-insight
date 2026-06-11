@@ -22,11 +22,11 @@ router.get('/', async (req, res, next) => {
                 t.*,
                 COUNT(te.id)                                        AS event_count,
                 COUNT(te.id) FILTER (WHERE te.is_milestone = TRUE)  AS milestone_count
-             FROM event_template t
-             LEFT JOIN template_events te ON te.template_id = t.id
+             FROM milestone_pattern t
+             LEFT JOIN milestone_pattern_events te ON te.pattern_id = t.id
              WHERE ${where.join(' AND ')}
              GROUP BY t.id
-             ORDER BY t.template_name`,
+             ORDER BY t.pattern_name`,
             params
         );
         res.json(rows);
@@ -55,10 +55,10 @@ router.get('/:id/events', async (req, res, next) => {
                 m.event_type,
                 m.owner_department,
                 m.standard_lead_days
-             FROM template_events  te
-             JOIN event_master     m ON m.id = te.event_master_id
-             WHERE te.template_id = $1
-               AND m.is_active    = TRUE
+             FROM milestone_pattern_events te
+             JOIN event_master             m ON m.id = te.event_master_id
+             WHERE te.pattern_id = $1
+               AND m.is_active   = TRUE
              ORDER BY te.sort_order ASC`,
             [req.params.id]
         );

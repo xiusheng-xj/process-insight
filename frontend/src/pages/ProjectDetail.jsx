@@ -39,6 +39,28 @@ function DiffCell({ diffDays, planDate, actualDate }) {
     return <span className="diff diff-late">+{diffDays}日</span>;
 }
 
+/* ── 案件情報カード サブ見出し ── */
+const SUB_LABEL_STYLE = {
+    fontSize: 11, fontWeight: 600, color: '#9ca3af', letterSpacing: '0.05em',
+    marginTop: 20, marginBottom: 8, paddingBottom: 4, borderBottom: '1px solid #f3f4f6',
+    textTransform: 'uppercase',
+};
+function SubLabel({ children }) {
+    return <div style={SUB_LABEL_STYLE}>{children}</div>;
+}
+
+function InfoVal({ label, value, mono = false }) {
+    const display = (value !== null && value !== undefined && value !== '') ? value : '—';
+    return (
+        <div className="info-item">
+            <div className="label">{label}</div>
+            <div className="value" style={mono ? { fontFamily: 'monospace' } : undefined}>
+                {display}
+            </div>
+        </div>
+    );
+}
+
 /* ── メインコンポーネント ── */
 export default function ProjectDetail() {
     const { id } = useParams();
@@ -175,37 +197,54 @@ export default function ProjectDetail() {
                 <div className="section-header">
                     <h2 className="section-title">案件情報</h2>
                 </div>
+
+                {/* ---- 基本情報 ---- */}
+                <SubLabel>基本情報</SubLabel>
                 <div className="info-grid">
-                    <div className="info-item">
-                        <div className="label">案件No</div>
-                        <div className="value" style={{ fontFamily: 'monospace' }}>{project.project_no}</div>
-                    </div>
-                    <div className="info-item">
-                        <div className="label">パターンNo</div>
-                        <div className="value">{project.pattern_no || '—'}</div>
-                    </div>
-                    <div className="info-item">
-                        <div className="label">機種</div>
-                        <div className="value">{project.machine_type || '—'}</div>
-                    </div>
-                    <div className="info-item">
-                        <div className="label">品名</div>
-                        <div className="value">{project.product_name || '—'}</div>
-                    </div>
-                    <div className="info-item">
-                        <div className="label">数量</div>
-                        <div className="value">{project.quantity ?? '—'}</div>
-                    </div>
-                    <div className="info-item">
-                        <div className="label">更新日時</div>
-                        <div className="value">{new Date(project.updated_at).toLocaleString('ja-JP')}</div>
+                    <InfoVal label="No" value={project.project_no} mono />
+                    <InfoVal label="パターン" value={project.pattern_no} />
+                    <InfoVal label="自部門担当者" value={null} />
+                    <InfoVal label="A部門担当者" value={null} />
+                    <InfoVal label="B部門担当者" value={null} />
+                    <InfoVal label="C部門担当者" value={null} />
+                </div>
+
+                {/* ---- 工程管理情報 ---- */}
+                <SubLabel>工程管理情報</SubLabel>
+                <div className="info-grid">
+                    <InfoVal label="初回登録日"
+                        value={new Date(project.created_at).toLocaleDateString('ja-JP')} />
+                    <InfoVal label="受注日" value={null} />
+                    <InfoVal label="価格 概算／確定" value={null} />
+                    <InfoVal label="要求納期" value={null} />
+                    <InfoVal label="回答納期" value={null} />
+                    <InfoVal label="納期調整状況" value={null} />
+                </div>
+
+                {/* ---- 案件情報 ---- */}
+                <SubLabel>案件情報</SubLabel>
+                <div className="info-grid">
+                    <InfoVal label="機種" value={project.machine_type} />
+                    <InfoVal label="案件名" value={project.project_name} />
+                    <InfoVal label="製品名" value={project.product_name} />
+                    <InfoVal label="数量" value={project.quantity} />
+                </div>
+                <div className="info-grid" style={{ marginTop: 12, gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))' }}>
+                    <InfoVal label="管理番号A" value={null} />
+                    <InfoVal label="管理番号B" value={null} />
+                    <InfoVal label="管理番号C" value={null} />
+                    <InfoVal label="管理番号D" value={null} />
+                    <InfoVal label="管理番号E" value={null} />
+                    <InfoVal label="管理番号F" value={null} />
+                </div>
+
+                {/* その他 */}
+                <div style={{ marginTop: 16 }}>
+                    <div className="label" style={{ display: 'block', marginBottom: 6 }}>その他</div>
+                    <div style={{ padding: '10px 14px', background: '#f9fafb', borderRadius: 6, fontSize: 13, color: project.comment ? '#374151' : '#9ca3af', lineHeight: 1.6, minHeight: 36 }}>
+                        {project.comment || '—'}
                     </div>
                 </div>
-                {project.comment && (
-                    <div style={{ marginTop: 16, padding: '10px 14px', background: '#f9fafb', borderRadius: 6, fontSize: 13, color: '#374151', lineHeight: 1.6 }}>
-                        {project.comment}
-                    </div>
-                )}
             </div>
 
             {/* ── イベント一覧 ── */}

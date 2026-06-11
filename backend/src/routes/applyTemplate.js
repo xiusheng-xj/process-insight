@@ -8,7 +8,8 @@ const db      = require('../db');
  *
  * 処理順序:
  *   1. 案件存在確認
- *   2. 既存イベント有無チェック（あればエラー）
+ *   2. 既存イベントを project_events_archive へ退避 → DELETE
+ *      （実績データ消失を防ぐため、全行を退避してから物理削除する）
  *   3. テンプレート取得（sort_order 昇順）
  *   4. 予定日計算
  *      - offset_base = 'project_start' → base_date + offset_days
@@ -16,7 +17,7 @@ const db      = require('../db');
  *        （最初のイベントは prev_event 指定でも project_start として扱う）
  *   5. project_events 一括 INSERT
  *   6. projects.applied_template_id 更新
- *   7. 生成イベント一覧を返す
+ *   7. 生成イベント一覧 + archived_count を返す
  */
 router.post('/', async (req, res, next) => {
     const client = await db.getClient();
@@ -42,20 +43,56 @@ router.post('/', async (req, res, next) => {
             return res.status(404).json({ error: '案件が見つかりません。' });
         }
 
-        // ── 2. 既存イベント有無チェック ───────────────────
-        const { rows: countRows } = await client.query(
-            'SELECT COUNT(*) AS cnt FROM project_events WHERE project_id = $1',
+        // ── 2. 既存イベントを archive へ退避してから DELETE ──────
+        // actual_date の有無にかかわらず全行退避する（データ消失防止）
+        const archivedBy = req.headers['x-user-name'] || 'system';
+
+        const { rowCount: archivedCount } = await client.query(
+            `INSERT INTO project_events_archive (
+                source_project_id,
+                source_event_id,
+                source_event_code,
+                source_event_name,
+                event_type,
+                plan_date,
+                actual_date,
+                actual_date_prev1,
+                actual_date_prev2,
+                diff_days,
+                status,
+                owner_department,
+                updated_by,
+                event_master_id,
+                archived_reason,
+                archived_by
+            )
+            SELECT
+                e.project_id,
+                e.id,
+                m.event_code,
+                e.event_name,
+                e.event_type,
+                e.plan_date,
+                e.actual_date,
+                e.actual_date_prev1,
+                e.actual_date_prev2,
+                e.diff_days,
+                e.status,
+                e.owner_department,
+                e.updated_by,
+                e.event_master_id,
+                'template_reapply',
+                $2
+            FROM project_events e
+            LEFT JOIN event_master m ON m.id = e.event_master_id
+            WHERE e.project_id = $1`,
+            [projectId, archivedBy]
+        );
+
+        await client.query(
+            'DELETE FROM project_events WHERE project_id = $1',
             [projectId]
         );
-        const existingCount = Number(countRows[0].cnt);
-        if (existingCount > 0) {
-            await client.query('ROLLBACK');
-            return res.status(409).json({
-                error: `既に ${existingCount} 件のイベントが存在します。` +
-                       'テンプレート適用前に既存イベントをすべて削除してください。',
-                existing_count: existingCount,
-            });
-        }
 
         // ── 3. テンプレートイベント取得（sort_order 昇順）──
         const { rows: templateEvents } = await client.query(
@@ -159,6 +196,7 @@ router.post('/', async (req, res, next) => {
             applied_template_id: Number(template_id),
             base_date:           toDateStr(baseDate),
             event_count:         insertedEvents.length,
+            archived_count:      archivedCount,
             events:              insertedEvents,
         });
 

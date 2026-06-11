@@ -21,14 +21,16 @@ router.get('/', async (req, res, next) => {
 
         const { rows } = await db.query(
             `SELECT e.*,
+                    m.sort_order AS master_sort_order,
                     CASE
                         WHEN e.actual_date IS NULL AND e.plan_date < NOW()::DATE
                         THEN (NOW()::DATE - e.plan_date)
                         ELSE NULL
                     END AS overdue_days
              FROM project_events e
+             LEFT JOIN event_master m ON m.id = e.event_master_id
              WHERE ${where.join(' AND ')}
-             ORDER BY e.plan_date ASC NULLS LAST, e.id ASC`,
+             ORDER BY m.sort_order ASC NULLS LAST, e.plan_date ASC NULLS LAST, e.id ASC`,
             params
         );
         res.json(rows);

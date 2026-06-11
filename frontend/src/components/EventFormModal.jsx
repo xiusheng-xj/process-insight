@@ -1,13 +1,5 @@
 import { useState } from 'react';
 
-const EVENT_TYPES = [
-    { value: 'design',        label: '設計' },
-    { value: 'manufacturing', label: '製造' },
-    { value: 'inspection',    label: '検査' },
-    { value: 'delivery',      label: '出荷' },
-    { value: 'other',         label: 'その他' },
-];
-
 const EVENT_STATUSES = [
     { value: 'pending',     label: '未着手' },
     { value: 'in_progress', label: '着手中' },
@@ -71,23 +63,13 @@ export default function EventFormModal({ mode, event, onClose, onSubmit, loading
                 {err && <div className="error-state" style={{ marginBottom: 14 }}>{err}</div>}
 
                 <form onSubmit={handleSubmit}>
-                    <div className="form-row">
-                        <div className="form-group">
-                            <label className="form-label">工程種別</label>
-                            <select className="form-control" value={form.event_type} onChange={set('event_type')}>
-                                {EVENT_TYPES.map((t) => (
-                                    <option key={t.value} value={t.value}>{t.label}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label">状態</label>
-                            <select className="form-control" value={form.status} onChange={set('status')}>
-                                {EVENT_STATUSES.map((s) => (
-                                    <option key={s.value} value={s.value}>{s.label}</option>
-                                ))}
-                            </select>
-                        </div>
+                    <div className="form-group">
+                        <label className="form-label">状態</label>
+                        <select className="form-control" value={form.status} onChange={set('status')}>
+                            {EVENT_STATUSES.map((s) => (
+                                <option key={s.value} value={s.value}>{s.label}</option>
+                            ))}
+                        </select>
                     </div>
 
                     <div className="form-group">

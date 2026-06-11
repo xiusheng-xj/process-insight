@@ -24,11 +24,6 @@ const EVENT_STATUS = {
     delayed:     { label: '遅延',   cls: 'badge-delayed' },
 };
 
-const EVENT_TYPE_JP = {
-    design: '設計', manufacturing: '製造',
-    inspection: '検査', delivery: '出荷', other: 'その他',
-};
-
 /* ── 差異表示 ── */
 function DiffCell({ diffDays, planDate, actualDate }) {
     if (actualDate == null && planDate) {
@@ -267,7 +262,6 @@ export default function ProjectDetail() {
                         <table className="table">
                             <thead>
                                 <tr>
-                                    <th>工程種別</th>
                                     <th>イベント名</th>
                                     <th>担当部門</th>
                                     <th>予定日</th>
@@ -282,7 +276,7 @@ export default function ProjectDetail() {
                             <tbody>
                                 {events.length === 0 ? (
                                     <tr>
-                                        <td colSpan={editMode ? 10 : 9}>
+                                        <td colSpan={editMode ? 9 : 8}>
                                             <div className="empty-state">
                                                 {editMode
                                                     ? '「＋ イベント追加」からイベントを登録してください'
@@ -298,11 +292,6 @@ export default function ProjectDetail() {
 
                                         return (
                                             <tr key={ev.id} style={isOverdue ? { background: '#fff9f9' } : {}}>
-                                                <td>
-                                                    <span style={{ fontSize: 12, color: '#6b7280' }}>
-                                                        {EVENT_TYPE_JP[ev.event_type] || ev.event_type}
-                                                    </span>
-                                                </td>
                                                 <td style={{ fontWeight: 500 }}>{ev.event_name}</td>
                                                 <td style={{ color: '#6b7280' }}>{ev.owner_department || '—'}</td>
                                                 <td>{ev.plan_date ? ev.plan_date.slice(0, 10) : '—'}</td>

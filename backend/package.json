@@ -1,0 +1,24 @@
+{
+  "name": "process-schedule-backend",
+  "version": "1.0.0",
+  "description": "工程管理システム バックエンド API",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "start:safe": "node ../scripts/kill-port.js 6101 --node-only && node src/index.js",
+    "dev": "nodemon src/index.js",
+    "dev:safe": "node ../scripts/kill-port.js 6101 --node-only && nodemon src/index.js",
+    "check:ports": "node ../scripts/check-port.js 6101",
+    "kill:6101": "node ../scripts/kill-port.js 6101",
+    "db:migrate": "psql -U %DB_USER% -d %DB_NAME% -f src/db/schema.sql"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "pg": "^8.11.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.3"
+  }
+}

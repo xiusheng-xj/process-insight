@@ -1,0 +1,173 @@
+const express = require('express');
+const router  = express.Router({ mergeParams: true });
+const db      = require('../db');
+
+/**
+ * POST /api/projects/:id/apply-template
+ * body: { template_id: number, base_date?: string (YYYY-MM-DD) }
+ *
+ * 処理順序:
+ *   1. 案件存在確認
+ *   2. 既存イベント有無チェック（あればエラー）
+ *   3. テンプレート取得（sort_order 昇順）
+ *   4. 予定日計算
+ *      - offset_base = 'project_start' → base_date + offset_days
+ *      - offset_base = 'prev_event'    → 直前イベント予定日 + offset_days
+ *        （最初のイベントは prev_event 指定でも project_start として扱う）
+ *   5. project_events 一括 INSERT
+ *   6. projects.applied_template_id 更新
+ *   7. 生成イベント一覧を返す
+ */
+router.post('/', async (req, res, next) => {
+    const client = await db.getClient();
+    try {
+        await client.query('BEGIN');
+
+        const projectId  = req.params.id;
+        const { template_id, base_date } = req.body;
+
+        // ── 入力検証 ─────────────────────────────────────
+        if (!template_id) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: 'template_id は必須です。' });
+        }
+
+        // ── 1. 案件存在確認 ───────────────────────────────
+        const { rows: projectRows } = await client.query(
+            'SELECT id, project_no, project_name, created_at FROM projects WHERE id = $1',
+            [projectId]
+        );
+        if (!projectRows[0]) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: '案件が見つかりません。' });
+        }
+
+        // ── 2. 既存イベント有無チェック ───────────────────
+        const { rows: countRows } = await client.query(
+            'SELECT COUNT(*) AS cnt FROM project_events WHERE project_id = $1',
+            [projectId]
+        );
+        const existingCount = Number(countRows[0].cnt);
+        if (existingCount > 0) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({
+                error: `既に ${existingCount} 件のイベントが存在します。` +
+                       'テンプレート適用前に既存イベントをすべて削除してください。',
+                existing_count: existingCount,
+            });
+        }
+
+        // ── 3. テンプレートイベント取得（sort_order 昇順）──
+        const { rows: templateEvents } = await client.query(
+            `SELECT
+                te.sort_order,
+                te.offset_days,
+                te.offset_base,
+                te.is_milestone,
+                te.is_required,
+                m.id            AS event_master_id,
+                m.event_code,
+                m.event_name,
+                m.event_type,
+                m.owner_department
+             FROM template_events  te
+             JOIN event_master     m  ON m.id  = te.event_master_id
+             JOIN event_template   t  ON t.id  = te.template_id
+             WHERE te.template_id = $1
+               AND m.is_active    = TRUE
+               AND t.is_active    = TRUE
+             ORDER BY te.sort_order ASC`,
+            [template_id]
+        );
+
+        if (templateEvents.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({
+                error: 'テンプレートが見つからないか、有効な工程が登録されていません。',
+            });
+        }
+
+        // ── 4. 基準日の確定 ───────────────────────────────
+        // new Date('YYYY-MM-DD') は UTC 解釈されるため、ローカル日付として生成する
+        const parseLocalDate = (str) => {
+            const [y, m, d] = str.split('-').map(Number);
+            return new Date(y, m - 1, d);   // ローカルタイムゾーン基準
+        };
+        const toDateStr = (d) => {
+            const y   = d.getFullYear();
+            const m   = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        };
+
+        const baseDate = base_date ? parseLocalDate(base_date) : (() => {
+            const d = new Date(); d.setHours(0, 0, 0, 0); return d;
+        })();
+
+        // ── 5. 予定日計算 & 一括 INSERT ──────────────────
+        const insertedEvents = [];
+        let   prevPlanDate   = null;          // 直前イベントの Date オブジェクト
+
+        for (const te of templateEvents) {
+            // offset_base に応じた起点日
+            const anchorDate = (te.offset_base === 'prev_event' && prevPlanDate !== null)
+                ? prevPlanDate
+                : baseDate;
+
+            const planDate = new Date(anchorDate);
+            planDate.setDate(planDate.getDate() + te.offset_days);
+
+            const { rows } = await client.query(
+                `INSERT INTO project_events
+                    (project_id, event_master_id, event_type, event_name,
+                     plan_date, status, owner_department, updated_by)
+                 VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7)
+                 RETURNING *`,
+                [
+                    projectId,
+                    te.event_master_id,
+                    te.event_type,
+                    te.event_name,
+                    toDateStr(planDate),
+                    te.owner_department,
+                    req.headers['x-user-name'] || 'system',
+                ]
+            );
+
+            insertedEvents.push({
+                ...rows[0],
+                sort_order:   te.sort_order,
+                is_milestone: te.is_milestone,
+                is_required:  te.is_required,
+                event_code:   te.event_code,
+            });
+
+            prevPlanDate = planDate;
+        }
+
+        // ── 6. applied_template_id 更新 ──────────────────
+        await client.query(
+            'UPDATE projects SET applied_template_id = $1 WHERE id = $2',
+            [template_id, projectId]
+        );
+
+        await client.query('COMMIT');
+
+        res.status(201).json({
+            message:             `テンプレートを適用しました。${insertedEvents.length} 件のイベントを生成しました。`,
+            project_id:          Number(projectId),
+            applied_template_id: Number(template_id),
+            base_date:           toDateStr(baseDate),
+            event_count:         insertedEvents.length,
+            events:              insertedEvents,
+        });
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        next(err);
+    } finally {
+        client.release();
+    }
+});
+
+module.exports = router;

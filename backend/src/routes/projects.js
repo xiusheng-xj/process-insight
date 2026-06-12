@@ -112,11 +112,13 @@ router.put('/:id', async (req, res, next) => {
         const {
             pattern_no, machine_type, project_name, product_name, quantity, status, comment,
             owner_name, dept_a_owner, dept_b_owner, dept_c_owner,
-            order_date, price_type, price_amount,
+            order_date, estimated_price, final_price,
             required_delivery_date, promised_delivery_date, delivery_status,
             management_no_a, management_no_b, management_no_c,
             management_no_d, management_no_e, management_no_f,
         } = req.body;
+
+        const toNum = (v) => (v != null && v !== '') ? Number(v) : null;
 
         const { rows } = await client.query(
             `UPDATE projects SET
@@ -132,8 +134,8 @@ router.put('/:id', async (req, res, next) => {
                 dept_b_owner             = $10,
                 dept_c_owner             = $11,
                 order_date               = $12,
-                price_type               = $13,
-                price_amount             = $14,
+                estimated_price          = $13,
+                final_price              = $14,
                 required_delivery_date   = $15,
                 promised_delivery_date   = $16,
                 delivery_status          = $17,
@@ -150,19 +152,19 @@ router.put('/:id', async (req, res, next) => {
                 machine_type || null,
                 project_name || null,
                 product_name || null,
-                quantity != null && quantity !== '' ? quantity : null,
+                toNum(quantity),
                 status       || null,
                 comment      || null,
                 owner_name   || null,
                 dept_a_owner || null,
                 dept_b_owner || null,
                 dept_c_owner || null,
-                order_date              || null,
-                price_type              || null,
-                price_amount != null && price_amount !== '' ? price_amount : null,
-                required_delivery_date  || null,
-                promised_delivery_date  || null,
-                delivery_status         || null,
+                order_date             || null,
+                toNum(estimated_price),
+                toNum(final_price),
+                required_delivery_date || null,
+                promised_delivery_date || null,
+                delivery_status        || null,
                 management_no_a || null,
                 management_no_b || null,
                 management_no_c || null,

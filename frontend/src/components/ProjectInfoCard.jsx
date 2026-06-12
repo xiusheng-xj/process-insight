@@ -32,11 +32,6 @@ function Field({ label, children }) {
 const OWNER_OPTIONS = [
     '', '田中 太郎', '鈴木 一郎', '佐藤 花子', '山田 二郎', '伊藤 三郎',
 ];
-const PRICE_TYPES = [
-    { v: '',   l: '— 未設定 —' },
-    { v: '概算', l: '概算' },
-    { v: '確定', l: '確定' },
-];
 const DLVR_STATUSES = [
     { v: '',    l: '— 未設定 —' },
     { v: '暫定',  l: '暫定' },
@@ -56,13 +51,9 @@ function fmtDate(d) {
     if (!d) return '—';
     return new Date(d).toLocaleDateString('ja-JP');
 }
-function fmtPrice(type, amount) {
-    if (!type && (amount == null || amount === '')) return '—';
-    const parts = [
-        type || '',
-        amount != null && amount !== '' ? Number(amount).toLocaleString('ja-JP') + '円' : '',
-    ].filter(Boolean);
-    return parts.join(' / ') || '—';
+function fmtAmount(v) {
+    if (v == null || v === '') return '----';
+    return Number(v).toLocaleString('ja-JP') + '円';
 }
 function initForm(p) {
     return {
@@ -71,8 +62,8 @@ function initForm(p) {
         dept_b_owner:           p.dept_b_owner           || '',
         dept_c_owner:           p.dept_c_owner           || '',
         order_date:             p.order_date?.slice(0, 10)             || '',
-        price_type:             p.price_type             || '',
-        price_amount:           p.price_amount           ?? '',
+        estimated_price:        p.estimated_price        ?? '',
+        final_price:            p.final_price            ?? '',
         required_delivery_date: p.required_delivery_date?.slice(0, 10) || '',
         promised_delivery_date: p.promised_delivery_date?.slice(0, 10) || '',
         delivery_status:        p.delivery_status        || '',
@@ -115,10 +106,12 @@ export default function ProjectInfoCard({ project, patterns, onSaved }) {
         setSaving(true);
         setSaveError('');
         try {
+            const toNum = (v) => (v !== '' && v != null) ? Number(v) : null;
             await updateProject(project.id, {
                 ...form,
-                quantity:               form.quantity     !== '' ? Number(form.quantity)     : null,
-                price_amount:           form.price_amount !== '' ? Number(form.price_amount) : null,
+                quantity:               toNum(form.quantity),
+                estimated_price:        toNum(form.estimated_price),
+                final_price:            toNum(form.final_price),
                 order_date:             form.order_date             || null,
                 required_delivery_date: form.required_delivery_date || null,
                 promised_delivery_date: form.promised_delivery_date || null,
@@ -213,19 +206,22 @@ export default function ProjectInfoCard({ project, patterns, onSaved }) {
                                 <Field label="受注日">
                                     <input type="date" className="form-control" value={form.order_date} onChange={set('order_date')} />
                                 </Field>
-                                <Field label="価格種別">
-                                    <select className="form-control" value={form.price_type} onChange={set('price_type')}>
-                                        {PRICE_TYPES.map((o) => (
-                                            <option key={o.v} value={o.v}>{o.l}</option>
-                                        ))}
-                                    </select>
-                                </Field>
-                                <Field label="価格">
+                                <Field label="概算価格">
                                     <input
                                         type="number"
                                         className="form-control"
-                                        value={form.price_amount}
-                                        onChange={set('price_amount')}
+                                        value={form.estimated_price}
+                                        onChange={set('estimated_price')}
+                                        placeholder="0"
+                                        min="0"
+                                    />
+                                </Field>
+                                <Field label="確定価格">
+                                    <input
+                                        type="number"
+                                        className="form-control"
+                                        value={form.final_price}
+                                        onChange={set('final_price')}
                                         placeholder="0"
                                         min="0"
                                     />
@@ -246,9 +242,15 @@ export default function ProjectInfoCard({ project, patterns, onSaved }) {
                             </>
                         ) : (
                             <>
-                                <InfoVal label="受注日"        value={fmtDate(project.order_date)} />
-                                <InfoVal label="価格 概算／確定" value={fmtPrice(project.price_type, project.price_amount)} />
-                                <InfoVal label="要求納期"       value={fmtDate(project.required_delivery_date)} />
+                                <InfoVal label="受注日"  value={fmtDate(project.order_date)} />
+                                <div className="info-item">
+                                    <div className="label">価格</div>
+                                    <div className="value" style={{ lineHeight: 1.9 }}>
+                                        <div>概算：{fmtAmount(project.estimated_price)}</div>
+                                        <div>確定：{fmtAmount(project.final_price)}</div>
+                                    </div>
+                                </div>
+                                <InfoVal label="要求納期" value={fmtDate(project.required_delivery_date)} />
                                 <InfoVal label="回答納期"       value={fmtDate(project.promised_delivery_date)} />
                                 <InfoVal label="納期調整状況"    value={project.delivery_status} />
                             </>

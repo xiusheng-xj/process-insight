@@ -79,6 +79,8 @@ function initForm(p) {
         management_no_d:         p.management_no_d         || '',
         management_no_e:         p.management_no_e         || '',
         management_no_f:         p.management_no_f         || '',
+        doc_a_latest_submit_date: p.doc_a_latest_submit_date?.slice(0, 10) || '',
+        project_type:            p.project_type            || '',
         comment:                 p.comment                 || '',
     };
 }
@@ -117,8 +119,9 @@ export default function ProjectInfoCard({ project, patterns, onSaved }) {
                 order_date:              form.order_date              || null,
                 required_delivery_date:  form.required_delivery_date  || null,
                 promised_delivery_date:  form.promised_delivery_date  || null,
-                confirmed_delivery_date: form.confirmed_delivery_date || null,
-                status:                  form.manual_status           || 'active',
+                confirmed_delivery_date:  form.confirmed_delivery_date  || null,
+                doc_a_latest_submit_date: form.doc_a_latest_submit_date || null,
+                status:                   form.manual_status            || 'active',
             });
             setEditing(false);
             onSaved();
@@ -293,13 +296,25 @@ export default function ProjectInfoCard({ project, patterns, onSaved }) {
                                 <Field label="数量">
                                     <input type="number" className="form-control" value={form.quantity} onChange={set('quantity')} min="0" />
                                 </Field>
+                                <Field label="リピート／新規">
+                                    <select className="form-control" value={form.project_type} onChange={set('project_type')}>
+                                        <option value="">— 未設定 —</option>
+                                        <option value="繰返">繰返</option>
+                                        <option value="設計">設計</option>
+                                    </select>
+                                </Field>
+                                <Field label="書類A 最新版提出日">
+                                    <input type="date" className="form-control" value={form.doc_a_latest_submit_date} onChange={set('doc_a_latest_submit_date')} />
+                                </Field>
                             </>
                         ) : (
                             <>
-                                <InfoVal label="機種"  value={project.machine_type} />
-                                <InfoVal label="案件名" value={project.project_name} />
-                                <InfoVal label="製品名" value={project.product_name} />
-                                <InfoVal label="数量"   value={project.quantity} />
+                                <InfoVal label="機種"          value={project.machine_type} />
+                                <InfoVal label="案件名"        value={project.project_name} />
+                                <InfoVal label="製品名"        value={project.product_name} />
+                                <InfoVal label="数量"          value={project.quantity} />
+                                <InfoVal label="リピート／新規" value={project.project_type} />
+                                <InfoVal label="書類A 最新版提出日" value={fmtDate(project.doc_a_latest_submit_date)} />
                             </>
                         )}
                     </div>

@@ -153,6 +153,7 @@ router.put('/:id', async (req, res, next) => {
             required_delivery_date, promised_delivery_date, confirmed_delivery_date, delivery_status,
             management_no_a, management_no_b, management_no_c,
             management_no_d, management_no_e, management_no_f,
+            doc_a_latest_submit_date, project_type,
         } = req.body;
 
         const toNum = (v) => (v != null && v !== '') ? Number(v) : null;
@@ -182,8 +183,10 @@ router.put('/:id', async (req, res, next) => {
                 management_no_c          = $21,
                 management_no_d          = $22,
                 management_no_e          = $23,
-                management_no_f          = $24
-             WHERE id = $25
+                management_no_f          = $24,
+                doc_a_latest_submit_date = $25,
+                project_type             = $26
+             WHERE id = $27
              RETURNING *`,
             [
                 pattern_no   || null,
@@ -210,6 +213,8 @@ router.put('/:id', async (req, res, next) => {
                 management_no_d || null,
                 management_no_e || null,
                 management_no_f || null,
+                doc_a_latest_submit_date || null,
+                project_type             || null,
                 req.params.id,
             ]
         );

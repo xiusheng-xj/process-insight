@@ -2,6 +2,31 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 
+/* ── effective_status 算出 SQL ── */
+const EFFECTIVE_STATUS_SQL = `
+    CASE
+        WHEN p.status = 'on_hold'   THEN 'on_hold'
+        WHEN p.status = 'cancelled' THEN 'cancelled'
+        WHEN ec.done = 0            THEN 'not_started'
+        WHEN ec.done = ec.total AND ec.total > 0
+            AND p.project_name IS NOT NULL
+            AND p.owner_name IS NOT NULL
+            AND p.order_date IS NOT NULL
+            AND p.required_delivery_date IS NOT NULL
+            AND p.confirmed_delivery_date IS NOT NULL
+            THEN 'completed'
+        ELSE 'in_progress'
+    END
+`;
+
+/* ── イベント件数 LATERAL JOIN ── */
+const EVENT_COUNTS_LATERAL = `
+    LEFT JOIN LATERAL (
+        SELECT COUNT(*) AS total, COUNT(actual_date) AS done
+        FROM project_events WHERE project_id = p.id
+    ) ec ON TRUE
+`;
+
 // 一覧取得
 router.get('/', async (req, res, next) => {
     try {
@@ -33,12 +58,16 @@ router.get('/', async (req, res, next) => {
                      WHERE e2.project_id = p.id
                        AND e2.actual_date IS NULL
                        AND e2.plan_date < NOW()::DATE) AS delay_count,
+                    ec.total AS progress_total,
+                    ec.done  AS progress_done,
+                    ${EFFECTIVE_STATUS_SQL} AS effective_status,
                     CASE WHEN pl.lock_status = 'active' AND pl.expires_at > NOW()
                          THEN TRUE ELSE FALSE END AS is_locked,
                     pl.locked_by AS current_locked_by
              FROM projects p
              LEFT JOIN project_locks pl
                ON pl.project_id = p.id AND pl.lock_status = 'active' AND pl.expires_at > NOW()
+             ${EVENT_COUNTS_LATERAL}
              ${whereClause}
              ORDER BY p.updated_at DESC
              LIMIT $${params.length - 1} OFFSET $${params.length}`,
@@ -58,8 +87,13 @@ router.get('/:id', async (req, res, next) => {
         const { rows } = await db.query(
             `SELECT p.*,
                     (SELECT COUNT(*) FROM project_alerts a
-                     WHERE a.project_id = p.id AND a.is_resolved = FALSE) AS unresolved_alerts
-             FROM projects p WHERE p.id = $1`,
+                     WHERE a.project_id = p.id AND a.is_resolved = FALSE) AS unresolved_alerts,
+                    ec.total AS progress_total,
+                    ec.done  AS progress_done,
+                    ${EFFECTIVE_STATUS_SQL} AS effective_status
+             FROM projects p
+             ${EVENT_COUNTS_LATERAL}
+             WHERE p.id = $1`,
             [req.params.id]
         );
         if (!rows[0]) return res.status(404).json({ error: '案件が見つかりません。' });
@@ -116,7 +150,7 @@ router.put('/:id', async (req, res, next) => {
             pattern_no, machine_type, project_name, product_name, quantity, status, comment,
             owner_name, dept_a_owner, dept_b_owner, dept_c_owner,
             order_date, estimated_price, final_price,
-            required_delivery_date, promised_delivery_date, delivery_status,
+            required_delivery_date, promised_delivery_date, confirmed_delivery_date, delivery_status,
             management_no_a, management_no_b, management_no_c,
             management_no_d, management_no_e, management_no_f,
         } = req.body;
@@ -141,14 +175,15 @@ router.put('/:id', async (req, res, next) => {
                 final_price              = $14,
                 required_delivery_date   = $15,
                 promised_delivery_date   = $16,
-                delivery_status          = $17,
-                management_no_a          = $18,
-                management_no_b          = $19,
-                management_no_c          = $20,
-                management_no_d          = $21,
-                management_no_e          = $22,
-                management_no_f          = $23
-             WHERE id = $24
+                confirmed_delivery_date  = $17,
+                delivery_status          = $18,
+                management_no_a          = $19,
+                management_no_b          = $20,
+                management_no_c          = $21,
+                management_no_d          = $22,
+                management_no_e          = $23,
+                management_no_f          = $24
+             WHERE id = $25
              RETURNING *`,
             [
                 pattern_no   || null,
@@ -162,12 +197,13 @@ router.put('/:id', async (req, res, next) => {
                 dept_a_owner || null,
                 dept_b_owner || null,
                 dept_c_owner || null,
-                order_date             || null,
+                order_date              || null,
                 toNum(estimated_price),
                 toNum(final_price),
-                required_delivery_date || null,
-                promised_delivery_date || null,
-                delivery_status        || null,
+                required_delivery_date  || null,
+                promised_delivery_date  || null,
+                confirmed_delivery_date || null,
+                delivery_status         || null,
                 management_no_a || null,
                 management_no_b || null,
                 management_no_c || null,

@@ -12,10 +12,11 @@ import AlertBanner from '../components/AlertBanner';
 
 /* ── 定数 ── */
 const PROJECT_STATUS = {
-    active:    { label: '進行中',     cls: 'badge-active' },
-    completed: { label: '完了',       cls: 'badge-completed' },
-    on_hold:   { label: '保留',       cls: 'badge-on_hold' },
-    cancelled: { label: 'キャンセル', cls: 'badge-cancelled' },
+    not_started: { label: '未着手', cls: 'badge-pending'   },
+    in_progress: { label: '作業中', cls: 'badge-active'    },
+    completed:   { label: '完了',   cls: 'badge-completed' },
+    on_hold:     { label: '保留',   cls: 'badge-on_hold'   },
+    cancelled:   { label: '中止',   cls: 'badge-cancelled' },
 };
 
 const EVENT_STATUS = {
@@ -131,7 +132,7 @@ export default function ProjectDetail() {
         </div>
     );
 
-    const psi = PROJECT_STATUS[project.status] || { label: project.status, cls: 'badge-pending' };
+    const psi = PROJECT_STATUS[project.effective_status] || { label: project.effective_status, cls: 'badge-pending' };
 
     return (
         <div className="page">

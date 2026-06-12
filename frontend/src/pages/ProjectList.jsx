@@ -3,12 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { useProjects, useProjectMutations } from '../hooks/useProjects';
 import CreateProjectModal from '../components/CreateProjectModal';
 
-const STATUS_MAP = {
-    active:    { label: '進行中',     cls: 'badge-active' },
-    completed: { label: '完了',       cls: 'badge-completed' },
-    on_hold:   { label: '保留',       cls: 'badge-on_hold' },
-    cancelled: { label: 'キャンセル', cls: 'badge-cancelled' },
+const EFFECTIVE_STATUS_MAP = {
+    not_started: { label: '未着手', cls: 'badge-pending'   },
+    in_progress: { label: '作業中', cls: 'badge-active'    },
+    completed:   { label: '完了',   cls: 'badge-completed' },
+    on_hold:     { label: '保留',   cls: 'badge-on_hold'   },
+    cancelled:   { label: '中止',   cls: 'badge-cancelled' },
 };
+
+const MANUAL_STATUSES = new Set(['on_hold', 'cancelled']);
 
 export default function ProjectList() {
     const navigate = useNavigate();
@@ -35,7 +38,7 @@ export default function ProjectList() {
         setShowCreate(false);
     }, [create]);
 
-    const si = (s) => STATUS_MAP[s] || { label: s, cls: 'badge-pending' };
+    const si = (p) => EFFECTIVE_STATUS_MAP[p.effective_status] || { label: p.effective_status, cls: 'badge-pending' };
 
     return (
         <div className="page">
@@ -90,7 +93,8 @@ export default function ProjectList() {
                                     </tr>
                                 ) : (
                                     data.map((p) => {
-                                        const { label, cls } = si(p.status);
+                                        const { label, cls } = si(p);
+                                        const showProgress = !MANUAL_STATUSES.has(p.effective_status);
                                         return (
                                             <tr key={p.id} onClick={() => navigate(`/projects/${p.id}`)}>
                                                 <td>
@@ -100,7 +104,16 @@ export default function ProjectList() {
                                                 </td>
                                                 <td style={{ fontWeight: 500 }}>{p.project_name}</td>
                                                 <td style={{ color: '#6b7280' }}>{p.machine_type || '—'}</td>
-                                                <td><span className={`badge ${cls}`}>{label}</span></td>
+                                                <td>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                        <span className={`badge ${cls}`}>{label}</span>
+                                                        {showProgress && (
+                                                            <span style={{ fontSize: 11, color: '#9ca3af', whiteSpace: 'nowrap' }}>
+                                                                {p.progress_done}/{p.progress_total}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </td>
                                                 <td style={{ textAlign: 'center' }}>
                                                     {Number(p.delay_count) > 0
                                                         ? <span className="count-badge">{p.delay_count}</span>

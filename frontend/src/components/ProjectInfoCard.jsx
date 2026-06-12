@@ -57,27 +57,29 @@ function fmtAmount(v) {
 }
 function initForm(p) {
     return {
-        owner_name:             p.owner_name             || '',
-        dept_a_owner:           p.dept_a_owner           || '',
-        dept_b_owner:           p.dept_b_owner           || '',
-        dept_c_owner:           p.dept_c_owner           || '',
-        order_date:             p.order_date?.slice(0, 10)             || '',
-        estimated_price:        p.estimated_price        ?? '',
-        final_price:            p.final_price            ?? '',
-        required_delivery_date: p.required_delivery_date?.slice(0, 10) || '',
-        promised_delivery_date: p.promised_delivery_date?.slice(0, 10) || '',
-        delivery_status:        p.delivery_status        || '',
-        machine_type:           p.machine_type           || '',
-        project_name:           p.project_name           || '',
-        product_name:           p.product_name           || '',
-        quantity:               p.quantity               ?? '',
-        management_no_a:        p.management_no_a        || '',
-        management_no_b:        p.management_no_b        || '',
-        management_no_c:        p.management_no_c        || '',
-        management_no_d:        p.management_no_d        || '',
-        management_no_e:        p.management_no_e        || '',
-        management_no_f:        p.management_no_f        || '',
-        comment:                p.comment                || '',
+        owner_name:              p.owner_name              || '',
+        dept_a_owner:            p.dept_a_owner            || '',
+        dept_b_owner:            p.dept_b_owner            || '',
+        dept_c_owner:            p.dept_c_owner            || '',
+        manual_status:           ['on_hold', 'cancelled'].includes(p.status) ? p.status : '',
+        order_date:              p.order_date?.slice(0, 10)              || '',
+        estimated_price:         p.estimated_price         ?? '',
+        final_price:             p.final_price             ?? '',
+        required_delivery_date:  p.required_delivery_date?.slice(0, 10)  || '',
+        promised_delivery_date:  p.promised_delivery_date?.slice(0, 10)  || '',
+        confirmed_delivery_date: p.confirmed_delivery_date?.slice(0, 10) || '',
+        delivery_status:         p.delivery_status         || '',
+        machine_type:            p.machine_type            || '',
+        project_name:            p.project_name            || '',
+        product_name:            p.product_name            || '',
+        quantity:                p.quantity                ?? '',
+        management_no_a:         p.management_no_a         || '',
+        management_no_b:         p.management_no_b         || '',
+        management_no_c:         p.management_no_c         || '',
+        management_no_d:         p.management_no_d         || '',
+        management_no_e:         p.management_no_e         || '',
+        management_no_f:         p.management_no_f         || '',
+        comment:                 p.comment                 || '',
     };
 }
 
@@ -109,12 +111,14 @@ export default function ProjectInfoCard({ project, patterns, onSaved }) {
             const toNum = (v) => (v !== '' && v != null) ? Number(v) : null;
             await updateProject(project.id, {
                 ...form,
-                quantity:               toNum(form.quantity),
-                estimated_price:        toNum(form.estimated_price),
-                final_price:            toNum(form.final_price),
-                order_date:             form.order_date             || null,
-                required_delivery_date: form.required_delivery_date || null,
-                promised_delivery_date: form.promised_delivery_date || null,
+                quantity:                toNum(form.quantity),
+                estimated_price:         toNum(form.estimated_price),
+                final_price:             toNum(form.final_price),
+                order_date:              form.order_date              || null,
+                required_delivery_date:  form.required_delivery_date  || null,
+                promised_delivery_date:  form.promised_delivery_date  || null,
+                confirmed_delivery_date: form.confirmed_delivery_date || null,
+                status:                  form.manual_status           || 'active',
             });
             setEditing(false);
             onSaved();
@@ -186,6 +190,17 @@ export default function ProjectInfoCard({ project, patterns, onSaved }) {
                                 <Field label="C部門担当者">
                                     <OwnerSelect value={form.dept_c_owner} onChange={set('dept_c_owner')} />
                                 </Field>
+                                <Field label="案件状態">
+                                    <select
+                                        className="form-control"
+                                        value={form.manual_status}
+                                        onChange={set('manual_status')}
+                                    >
+                                        <option value="">自動判定</option>
+                                        <option value="on_hold">保留</option>
+                                        <option value="cancelled">中止</option>
+                                    </select>
+                                </Field>
                             </>
                         ) : (
                             <>
@@ -232,6 +247,9 @@ export default function ProjectInfoCard({ project, patterns, onSaved }) {
                                 <Field label="回答納期">
                                     <input type="date" className="form-control" value={form.promised_delivery_date} onChange={set('promised_delivery_date')} />
                                 </Field>
+                                <Field label="確定納期">
+                                    <input type="date" className="form-control" value={form.confirmed_delivery_date} onChange={set('confirmed_delivery_date')} />
+                                </Field>
                                 <Field label="納期調整状況">
                                     <select className="form-control" value={form.delivery_status} onChange={set('delivery_status')}>
                                         {DLVR_STATUSES.map((o) => (
@@ -242,7 +260,7 @@ export default function ProjectInfoCard({ project, patterns, onSaved }) {
                             </>
                         ) : (
                             <>
-                                <InfoVal label="受注日"  value={fmtDate(project.order_date)} />
+                                <InfoVal label="受注日"      value={fmtDate(project.order_date)} />
                                 <div className="info-item">
                                     <div className="label">価格</div>
                                     <div className="value" style={{ lineHeight: 1.9 }}>
@@ -250,9 +268,10 @@ export default function ProjectInfoCard({ project, patterns, onSaved }) {
                                         <div>確定：{fmtAmount(project.final_price)}</div>
                                     </div>
                                 </div>
-                                <InfoVal label="要求納期" value={fmtDate(project.required_delivery_date)} />
-                                <InfoVal label="回答納期"       value={fmtDate(project.promised_delivery_date)} />
-                                <InfoVal label="納期調整状況"    value={project.delivery_status} />
+                                <InfoVal label="要求納期"    value={fmtDate(project.required_delivery_date)} />
+                                <InfoVal label="回答納期"    value={fmtDate(project.promised_delivery_date)} />
+                                <InfoVal label="確定納期"    value={fmtDate(project.confirmed_delivery_date)} />
+                                <InfoVal label="納期調整状況" value={project.delivery_status} />
                             </>
                         )}
                     </div>

@@ -118,10 +118,16 @@ export default function ProjectDetail() {
 
     /* ── ローディング / エラー ── */
     if (pLoading) return <div className="page"><div className="loading-state">読み込み中…</div></div>;
-    if (pError || !project) return (
+    if (pError)   return (
         <div className="page">
             <Link to="/projects" className="back-link">← 案件一覧へ戻る</Link>
-            <div className="error-state">{pError || '案件が見つかりません'}</div>
+            <div className="error-state">案件情報の取得に失敗しました: {pError}</div>
+        </div>
+    );
+    if (!project) return (
+        <div className="page">
+            <Link to="/projects" className="back-link">← 案件一覧へ戻る</Link>
+            <div className="error-state">案件情報が見つかりません</div>
         </div>
     );
 

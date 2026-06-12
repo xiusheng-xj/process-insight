@@ -72,22 +72,25 @@ router.get('/:id', async (req, res, next) => {
 // 新規作成
 router.post('/', async (req, res, next) => {
     try {
-        const { project_no, pattern_no, machine_type, project_name, product_name, quantity, status, comment } = req.body;
-        if (!project_no || !project_name) {
-            return res.status(400).json({ error: 'project_no と project_name は必須です。' });
-        }
+        const { project_no, project_name, owner_name, applied_milestone_pattern_id } = req.body;
+        if (!project_no?.trim())   return res.status(400).json({ error: 'project_no は必須です。' });
+        if (!project_name?.trim()) return res.status(400).json({ error: 'project_name は必須です。' });
+        if (!owner_name?.trim())   return res.status(400).json({ error: 'owner_name は必須です。' });
 
         const { rows } = await db.query(
             `INSERT INTO projects
-                (project_no, pattern_no, machine_type, project_name, product_name, quantity, status, comment)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+                (project_no, project_name, owner_name, applied_milestone_pattern_id, status)
+             VALUES ($1, $2, $3, $4, 'active')
              RETURNING *`,
-            [project_no, pattern_no, machine_type, project_name, product_name, quantity ?? 0, status ?? 'active', comment]
+            [
+                project_no.trim(),
+                project_name.trim(),
+                owner_name.trim(),
+                applied_milestone_pattern_id || null,
+            ]
         );
         res.status(201).json(rows[0]);
-    } catch (err) {
-        next(err);
-    }
+    } catch (err) { next(err); }
 });
 
 // 更新

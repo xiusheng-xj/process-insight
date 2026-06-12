@@ -1,26 +1,47 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { fetchMilestonePatterns } from '../api/projects';
+
+const OWNER_OPTIONS = [
+    '', '田中 太郎', '鈴木 一郎', '佐藤 花子', '山田 二郎', '伊藤 三郎',
+];
+
+function fmtPattern(p) {
+    const m = p.pattern_name.match(/パターン(\d+)（(.+)）/);
+    return m ? `${m[1]}：${m[2]}` : p.pattern_name;
+}
 
 const INITIAL = {
-    project_no: '', pattern_no: '', machine_type: '',
-    project_name: '', product_name: '',
-    quantity: '', status: 'active', comment: '',
+    project_no:                   '',
+    project_name:                 '',
+    owner_name:                   '',
+    applied_milestone_pattern_id: '',
 };
 
 export default function CreateProjectModal({ onClose, onSubmit, loading, serverError }) {
-    const [form, setForm] = useState(INITIAL);
-    const [err, setErr]   = useState('');
+    const [form,     setForm]     = useState(INITIAL);
+    const [err,      setErr]      = useState('');
+    const [patterns, setPatterns] = useState([]);
+
+    useEffect(() => {
+        fetchMilestonePatterns().then(setPatterns).catch(() => {});
+    }, []);
 
     const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setErr('');
-        if (!form.project_no.trim())   { setErr('案件Noは必須です。');  return; }
-        if (!form.project_name.trim()) { setErr('案件名は必須です。'); return; }
+        if (!form.project_no.trim())   { setErr('案件Noは必須です。');       return; }
+        if (!form.project_name.trim()) { setErr('案件名は必須です。');       return; }
+        if (!form.owner_name)          { setErr('自部門担当者は必須です。'); return; }
         try {
             await onSubmit({
-                ...form,
-                quantity: form.quantity !== '' ? Number(form.quantity) : 0,
+                project_no:   form.project_no.trim(),
+                project_name: form.project_name.trim(),
+                owner_name:   form.owner_name,
+                applied_milestone_pattern_id: form.applied_milestone_pattern_id
+                    ? Number(form.applied_milestone_pattern_id)
+                    : null,
             });
         } catch (ex) {
             setErr(ex.message || '作成に失敗しました。');
@@ -42,24 +63,14 @@ export default function CreateProjectModal({ onClose, onSubmit, loading, serverE
                 )}
 
                 <form onSubmit={handleSubmit}>
-                    <div className="form-row">
-                        <div className="form-group">
-                            <label className="form-label req">案件No</label>
-                            <input
-                                className="form-control"
-                                value={form.project_no}
-                                onChange={set('project_no')}
-                                placeholder="例: PRJ-2026-001"
-                            />
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label">パターンNo</label>
-                            <input
-                                className="form-control"
-                                value={form.pattern_no}
-                                onChange={set('pattern_no')}
-                            />
-                        </div>
+                    <div className="form-group">
+                        <label className="form-label req">案件No</label>
+                        <input
+                            className="form-control"
+                            value={form.project_no}
+                            onChange={set('project_no')}
+                            placeholder="例: PRJ-2026-001"
+                        />
                     </div>
 
                     <div className="form-group">
@@ -72,53 +83,31 @@ export default function CreateProjectModal({ onClose, onSubmit, loading, serverE
                         />
                     </div>
 
-                    <div className="form-row">
-                        <div className="form-group">
-                            <label className="form-label">機種</label>
-                            <input
-                                className="form-control"
-                                value={form.machine_type}
-                                onChange={set('machine_type')}
-                            />
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label">品名</label>
-                            <input
-                                className="form-control"
-                                value={form.product_name}
-                                onChange={set('product_name')}
-                            />
-                        </div>
-                    </div>
-
-                    <div className="form-row">
-                        <div className="form-group">
-                            <label className="form-label">数量</label>
-                            <input
-                                className="form-control"
-                                type="number"
-                                min="0"
-                                value={form.quantity}
-                                onChange={set('quantity')}
-                            />
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label">状態</label>
-                            <select className="form-control" value={form.status} onChange={set('status')}>
-                                <option value="active">進行中</option>
-                                <option value="on_hold">保留</option>
-                            </select>
-                        </div>
+                    <div className="form-group">
+                        <label className="form-label req">自部門担当者</label>
+                        <select
+                            className="form-control"
+                            value={form.owner_name}
+                            onChange={set('owner_name')}
+                        >
+                            {OWNER_OPTIONS.map((o) => (
+                                <option key={o} value={o}>{o || '— 選択してください —'}</option>
+                            ))}
+                        </select>
                     </div>
 
                     <div className="form-group">
-                        <label className="form-label">備考</label>
-                        <textarea
+                        <label className="form-label">フローパターン</label>
+                        <select
                             className="form-control"
-                            rows={3}
-                            value={form.comment}
-                            onChange={set('comment')}
-                        />
+                            value={form.applied_milestone_pattern_id}
+                            onChange={set('applied_milestone_pattern_id')}
+                        >
+                            <option value="">— 未選択 —</option>
+                            {patterns.map((p) => (
+                                <option key={p.id} value={p.id}>{fmtPattern(p)}</option>
+                            ))}
+                        </select>
                     </div>
 
                     <div className="modal-footer">

@@ -57,6 +57,16 @@ export const deleteEvent = async (projectId, eventId) => {
 };
 
 /**
+ * イベント並び替え一括保存
+ * @param {number} projectId
+ * @param {{ id: number, sort_order: number }[]} items
+ */
+export const reorderEvents = async (projectId, items) => {
+    const res = await client.patch(`/projects/${projectId}/events/reorder`, items);
+    return res.data;
+};
+
+/**
  * イベントマスター一覧取得
  * @param {{ event_type?: string }} params
  * @returns {EventMaster[]}

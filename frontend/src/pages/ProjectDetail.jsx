@@ -1,18 +1,28 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import {
+    DndContext, closestCenter,
+    PointerSensor, useSensor, useSensors,
+} from '@dnd-kit/core';
+import {
+    SortableContext, verticalListSortingStrategy,
+    useSortable, arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useProject } from '../hooks/useProjects';
 import { useEvents, useEventMutations } from '../hooks/useEvents';
 import { useAlerts } from '../hooks/useAlerts';
 import { useLock } from '../hooks/useLock';
 import { fetchMilestonePatterns, applyMilestonePattern, deleteProject } from '../api/projects';
-import EventFormModal      from '../components/EventFormModal';
-import ApplyPatternModal   from '../components/ApplyPatternModal';
-import ProjectInfoCard     from '../components/ProjectInfoCard';
-import AlertBanner         from '../components/AlertBanner';
-import ScheduleSummary     from '../components/ScheduleSummary';
+import { reorderEvents } from '../api/events';
+import EventFormModal            from '../components/EventFormModal';
+import ApplyPatternModal         from '../components/ApplyPatternModal';
+import ProjectInfoCard           from '../components/ProjectInfoCard';
+import AlertBanner               from '../components/AlertBanner';
+import ScheduleSummary           from '../components/ScheduleSummary';
 import DeleteProjectModal        from '../components/DeleteProjectModal';
-import GanttChart               from '../components/GanttChart';
-import EventMasterSelectModal   from '../components/EventMasterSelectModal';
+import GanttChart                from '../components/GanttChart';
+import EventMasterSelectModal    from '../components/EventMasterSelectModal';
 
 /* ── 定数 ── */
 const PROJECT_STATUS = {
@@ -45,16 +55,95 @@ function DiffCell({ diffDays, planDate, actualDate }) {
     return <span className="diff diff-late">+{diffDays}日</span>;
 }
 
+/* ── ソート可能イベント行 ── */
+function SortableRow({ ev, editMode, eMutating, onEdit, onDelete }) {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: ev.id });
+
+    const esi = EVENT_STATUS[ev.status] || { label: ev.status, cls: 'badge-pending' };
+    const isOverdue = !ev.actual_date && ev.plan_date && new Date(ev.plan_date) < new Date();
+
+    const rowStyle = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        ...(isDragging
+            ? { background: '#eff6ff', opacity: 0.85, boxShadow: '0 4px 14px rgba(0,0,0,0.1)', position: 'relative', zIndex: 10 }
+            : isOverdue
+            ? { background: '#fff9f9' }
+            : {}),
+    };
+
+    return (
+        <tr ref={setNodeRef} style={rowStyle} {...attributes}>
+            {editMode && (
+                <td style={{ width: 32, textAlign: 'center', userSelect: 'none' }}>
+                    <span
+                        {...listeners}
+                        title="ドラッグして並び替え"
+                        style={{ display: 'inline-block', cursor: 'grab', color: '#9ca3af', fontSize: 18, lineHeight: 1, padding: '4px 2px' }}
+                    >
+                        ≡
+                    </span>
+                </td>
+            )}
+            <td style={{ fontWeight: 500 }}>
+                {ev.event_name}
+                {ev.is_custom && (
+                    <span style={{ marginLeft: 4, fontSize: 9, color: '#6366f1', background: '#eef2ff', borderRadius: 3, padding: '1px 4px' }}>固有</span>
+                )}
+            </td>
+            <td style={{ color: '#6b7280' }}>{ev.owner_department || '—'}</td>
+            <td>{ev.plan_date ? ev.plan_date.slice(0, 10) : '—'}</td>
+            <td>
+                {ev.actual_date
+                    ? ev.actual_date.slice(0, 10)
+                    : <span style={{ color: '#9ca3af' }}>未入力</span>}
+            </td>
+            <td style={{ color: '#6b7280', fontSize: 12 }}>
+                {ev.actual_date_prev1 ? ev.actual_date_prev1.slice(0, 10) : '—'}
+            </td>
+            <td style={{ color: '#9ca3af', fontSize: 12 }}>
+                {ev.actual_date_prev2 ? ev.actual_date_prev2.slice(0, 10) : '—'}
+            </td>
+            <td>
+                <DiffCell diffDays={ev.diff_days} planDate={ev.plan_date} actualDate={ev.actual_date} />
+            </td>
+            <td><span className={`badge ${esi.cls}`}>{esi.label}</span></td>
+            {editMode && (
+                <td>
+                    <div className="btn-group">
+                        <button
+                            className="btn btn-secondary btn-xs"
+                            onClick={() => onEdit(ev)}
+                            disabled={eMutating}
+                        >
+                            編集
+                        </button>
+                        <button
+                            className="btn btn-ghost btn-xs"
+                            style={{ color: '#dc2626' }}
+                            onClick={() => onDelete(ev)}
+                            disabled={eMutating}
+                        >
+                            削除
+                        </button>
+                    </div>
+                </td>
+            )}
+        </tr>
+    );
+}
+
 /* ── メインコンポーネント ── */
 export default function ProjectDetail() {
     const { id } = useParams();
     const navigate = useNavigate();
-    const [editMode, setEditMode]           = useState(false);
-    const [eventModal, setEventModal]       = useState(null); // { mode:'create'|'edit', event? }
-    const [showDelete, setShowDelete]       = useState(false);
-    const [deleting, setDeleting]           = useState(false);
-    const [eventTab, setEventTab]           = useState('list'); // 'list' | 'gantt'
+    const [editMode, setEditMode]                 = useState(false);
+    const [eventModal, setEventModal]             = useState(null);
+    const [showDelete, setShowDelete]             = useState(false);
+    const [deleting, setDeleting]                 = useState(false);
+    const [eventTab, setEventTab]                 = useState('list');
     const [showMasterSelect, setShowMasterSelect] = useState(false);
+    const [localEvents, setLocalEvents]           = useState([]);
 
     const { data: project, loading: pLoading, error: pError, reload: reloadProject } = useProject(id);
     const { data: events,  loading: eLoading, error: eError, reload: reloadEvents } = useEvents(id);
@@ -67,6 +156,34 @@ export default function ProjectDetail() {
     const [patternModal, setPatternModal] = useState(false);
     const [applyLoading, setApplyLoading] = useState(false);
     const [applyResult, setApplyResult]   = useState(null); // { generated, archived }
+
+    /* ── サーバー取得イベントをローカル状態に同期 ── */
+    useEffect(() => { setLocalEvents(events); }, [events]);
+
+    /* ── DnD センサー（5px 以上移動でドラッグ開始） ── */
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+    );
+
+    /* ── ドラッグ完了: 楽観更新 → API 保存 ── */
+    const handleDragEnd = useCallback(async ({ active, over }) => {
+        if (!over || active.id === over.id) return;
+        const oldIdx = localEvents.findIndex(e => e.id === active.id);
+        const newIdx = localEvents.findIndex(e => e.id === over.id);
+        if (oldIdx === -1 || newIdx === -1) return;
+
+        const newOrder = arrayMove(localEvents, oldIdx, newIdx);
+        setLocalEvents(newOrder);
+
+        const payload = newOrder.map((e, i) => ({ id: e.id, sort_order: (i + 1) * 10 }));
+        try {
+            await reorderEvents(id, payload);
+            reloadEvents();
+        } catch {
+            setLocalEvents(events); // 失敗時はロールバック
+            alert('並び替えの保存に失敗しました。');
+        }
+    }, [localEvents, events, id, reloadEvents]);
 
     useEffect(() => {
         fetchMilestonePatterns().then(setPatterns).catch(() => {});
@@ -237,9 +354,9 @@ export default function ProjectDetail() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
                             <h2 className="section-title" style={{ margin: 0 }}>
                                 {eventTab === 'list' ? 'イベント一覧' : 'ガントチャート'}
-                                {events.length > 0 && (
+                                {localEvents.length > 0 && (
                                     <span style={{ fontSize: 13, fontWeight: 400, color: '#6b7280', marginLeft: 8 }}>
-                                        {events.length} 件
+                                        {localEvents.length} 件
                                     </span>
                                 )}
                             </h2>
@@ -309,99 +426,57 @@ export default function ProjectDetail() {
 
                 {/* ── ガントチャートタブ ── */}
                 {!eLoading && !eError && eventTab === 'gantt' && (
-                    <GanttChart events={events} />
+                    <GanttChart events={localEvents} />
                 )}
 
+                {/* ── イベント一覧タブ（DnD ソータブル） ── */}
                 {!eLoading && !eError && eventTab === 'list' && (
-                    <div className="table-wrap">
-                        <table className="table">
-                            <thead>
-                                <tr>
-                                    <th>イベント名</th>
-                                    <th>担当部門</th>
-                                    <th>予定日</th>
-                                    <th>最新実績</th>
-                                    <th>前回実績</th>
-                                    <th>前々回実績</th>
-                                    <th>差異</th>
-                                    <th>状態</th>
-                                    {editMode && <th style={{ width: 100 }}>操作</th>}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {events.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={editMode ? 9 : 8}>
-                                            <div className="empty-state">
-                                                {editMode
-                                                    ? '「＋ イベント追加」からイベントを登録してください'
-                                                    : 'イベントがありません'}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    events.map((ev) => {
-                                        const esi = EVENT_STATUS[ev.status] || { label: ev.status, cls: 'badge-pending' };
-                                        const isOverdue = !ev.actual_date && ev.plan_date
-                                            && new Date(ev.plan_date) < new Date();
-
-                                        return (
-                                            <tr key={ev.id} style={isOverdue ? { background: '#fff9f9' } : {}}>
-                                                <td style={{ fontWeight: 500 }}>
-                                                    {ev.event_name}
-                                                    {ev.is_custom && (
-                                                        <span style={{ marginLeft: 4, fontSize: 9, color: '#6366f1', background: '#eef2ff', borderRadius: 3, padding: '1px 4px' }}>固有</span>
-                                                    )}
+                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                        <SortableContext items={localEvents.map(e => e.id)} strategy={verticalListSortingStrategy}>
+                            <div className="table-wrap">
+                                <table className="table">
+                                    <thead>
+                                        <tr>
+                                            {editMode && <th style={{ width: 32 }} title="並び替え" />}
+                                            <th>イベント名</th>
+                                            <th>担当部門</th>
+                                            <th>予定日</th>
+                                            <th>最新実績</th>
+                                            <th>前回実績</th>
+                                            <th>前々回実績</th>
+                                            <th>差異</th>
+                                            <th>状態</th>
+                                            {editMode && <th style={{ width: 100 }}>操作</th>}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {localEvents.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={editMode ? 10 : 8}>
+                                                    <div className="empty-state">
+                                                        {editMode
+                                                            ? '「＋ イベント追加」からイベントを登録してください'
+                                                            : 'イベントがありません'}
+                                                    </div>
                                                 </td>
-                                                <td style={{ color: '#6b7280' }}>{ev.owner_department || '—'}</td>
-                                                <td>{ev.plan_date ? ev.plan_date.slice(0, 10) : '—'}</td>
-                                                <td>
-                                                    {ev.actual_date
-                                                        ? ev.actual_date.slice(0, 10)
-                                                        : <span style={{ color: '#9ca3af' }}>未入力</span>}
-                                                </td>
-                                                <td style={{ color: '#6b7280', fontSize: 12 }}>
-                                                    {ev.actual_date_prev1 ? ev.actual_date_prev1.slice(0, 10) : '—'}
-                                                </td>
-                                                <td style={{ color: '#9ca3af', fontSize: 12 }}>
-                                                    {ev.actual_date_prev2 ? ev.actual_date_prev2.slice(0, 10) : '—'}
-                                                </td>
-                                                <td>
-                                                    <DiffCell
-                                                        diffDays={ev.diff_days}
-                                                        planDate={ev.plan_date}
-                                                        actualDate={ev.actual_date}
-                                                    />
-                                                </td>
-                                                <td><span className={`badge ${esi.cls}`}>{esi.label}</span></td>
-                                                {editMode && (
-                                                    <td>
-                                                        <div className="btn-group">
-                                                            <button
-                                                                className="btn btn-secondary btn-xs"
-                                                                onClick={() => setEventModal({ mode: 'edit', event: ev })}
-                                                                disabled={eMutating}
-                                                            >
-                                                                編集
-                                                            </button>
-                                                            <button
-                                                                className="btn btn-ghost btn-xs"
-                                                                style={{ color: '#dc2626' }}
-                                                                onClick={() => handleDeleteEvent(ev)}
-                                                                disabled={eMutating}
-                                                            >
-                                                                削除
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                )}
                                             </tr>
-                                        );
-                                    })
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                                        ) : (
+                                            localEvents.map((ev) => (
+                                                <SortableRow
+                                                    key={ev.id}
+                                                    ev={ev}
+                                                    editMode={editMode}
+                                                    eMutating={eMutating}
+                                                    onEdit={(e) => setEventModal({ mode: 'edit', event: e })}
+                                                    onDelete={handleDeleteEvent}
+                                                />
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </SortableContext>
+                    </DndContext>
                 )}
             </div>
 

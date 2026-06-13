@@ -39,6 +39,38 @@ router.get('/', async (req, res, next) => {
     }
 });
 
+// 並び替え一括更新
+router.patch('/reorder', async (req, res, next) => {
+    const client = await db.getClient();
+    try {
+        await client.query('BEGIN');
+
+        const { project_id } = req.params;
+        const items = req.body;
+
+        if (!Array.isArray(items) || items.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: '並び替えデータが不正です。' });
+        }
+
+        for (const item of items) {
+            await client.query(
+                `UPDATE project_events SET sort_order = $1
+                 WHERE id = $2 AND project_id = $3 AND deleted_at IS NULL`,
+                [item.sort_order, item.id, project_id]
+            );
+        }
+
+        await client.query('COMMIT');
+        res.json({ updated: items.length });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        next(err);
+    } finally {
+        client.release();
+    }
+});
+
 // 単件取得
 router.get('/:id', async (req, res, next) => {
     try {

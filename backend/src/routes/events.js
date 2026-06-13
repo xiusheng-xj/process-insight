@@ -8,7 +8,7 @@ router.get('/', async (req, res, next) => {
         const { project_id } = req.params;
         const { event_type, status } = req.query;
         const params = [project_id];
-        const where = ['e.project_id = $1'];
+        const where = ['e.project_id = $1', 'e.deleted_at IS NULL'];
 
         if (event_type) {
             params.push(event_type);
@@ -30,7 +30,7 @@ router.get('/', async (req, res, next) => {
              FROM project_events e
              LEFT JOIN event_master m ON m.id = e.event_master_id
              WHERE ${where.join(' AND ')}
-             ORDER BY m.sort_order ASC NULLS LAST, e.plan_date ASC NULLS LAST, e.id ASC`,
+             ORDER BY e.sort_order ASC NULLS LAST, e.plan_date ASC NULLS LAST, e.id ASC`,
             params
         );
         res.json(rows);
@@ -63,13 +63,22 @@ router.post('/', async (req, res, next) => {
             return res.status(400).json({ error: 'event_type と event_name は必須です。' });
         }
 
+        // sort_order = 既存の最大値 + 10（カスタムイベントは末尾に追加）
+        const { rows: soRows } = await db.query(
+            `SELECT COALESCE(MAX(sort_order), 0) + 10 AS next_so
+             FROM project_events WHERE project_id = $1 AND deleted_at IS NULL`,
+            [project_id]
+        );
+        const nextSortOrder = Number(soRows[0].next_so);
+
         const { rows } = await db.query(
             `INSERT INTO project_events
-                (project_id, event_type, event_name, plan_date, actual_date, status, owner_department, updated_by)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+                (project_id, event_type, event_name, plan_date, actual_date,
+                 status, owner_department, updated_by, is_custom, sort_order)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8, TRUE, $9)
              RETURNING *`,
             [project_id, event_type, event_name, plan_date || null, actual_date || null,
-             status ?? 'pending', owner_department, updated_by]
+             status ?? 'pending', owner_department, updated_by, nextSortOrder]
         );
 
         // 実績日入力時にアラート自動解決
@@ -153,15 +162,18 @@ router.put('/:id', async (req, res, next) => {
     }
 });
 
-// 削除
+// 論理削除（物理削除禁止）
 router.delete('/:id', async (req, res, next) => {
     try {
-        const { rowCount } = await db.query(
-            'DELETE FROM project_events WHERE id = $1 AND project_id = $2',
+        const { rows } = await db.query(
+            `UPDATE project_events
+             SET deleted_at = NOW()
+             WHERE id = $1 AND project_id = $2 AND deleted_at IS NULL
+             RETURNING id`,
             [req.params.id, req.params.project_id]
         );
-        if (!rowCount) return res.status(404).json({ error: 'イベントが見つかりません。' });
-        res.status(204).send();
+        if (!rows[0]) return res.status(404).json({ error: 'イベントが見つかりません。' });
+        res.json({ id: rows[0].id });
     } catch (err) {
         next(err);
     }

@@ -11,6 +11,7 @@ import ProjectInfoCard     from '../components/ProjectInfoCard';
 import AlertBanner         from '../components/AlertBanner';
 import ScheduleSummary     from '../components/ScheduleSummary';
 import DeleteProjectModal  from '../components/DeleteProjectModal';
+import GanttChart          from '../components/GanttChart';
 
 /* ── 定数 ── */
 const PROJECT_STATUS = {
@@ -51,6 +52,7 @@ export default function ProjectDetail() {
     const [eventModal, setEventModal] = useState(null); // { mode:'create'|'edit', event? }
     const [showDelete, setShowDelete] = useState(false);
     const [deleting, setDeleting]     = useState(false);
+    const [eventTab, setEventTab]     = useState('list'); // 'list' | 'gantt'
 
     const { data: project, loading: pLoading, error: pError, reload: reloadProject } = useProject(id);
     const { data: events,  loading: eLoading, error: eError, reload: reloadEvents } = useEvents(id);
@@ -92,10 +94,11 @@ export default function ProjectDetail() {
             setApplyResult({
                 generated:   result.event_count,
                 archived:    result.archived_count,
-                carried:     result.carried_count    ?? 0,
-                restored:    result.restored_count   ?? 0,
-                calculated:  result.calculated_count ?? 0,
-                removed:     result.removed_count    ?? 0,
+                carried:     result.carried_count         ?? 0,
+                restored:    result.restored_count        ?? 0,
+                calculated:  result.calculated_count      ?? 0,
+                removed:     result.removed_count         ?? 0,
+                customKept:  result.custom_preserved_count ?? 0,
             });
             setPatternModal(false);
             reloadProject();
@@ -220,25 +223,42 @@ export default function ProjectDetail() {
             {/* ── スケジュール評価サマリー ── */}
             <ScheduleSummary project={project} />
 
-            {/* ── イベント一覧 ── */}
+            {/* ── イベント一覧 / ガントチャート ── */}
             <div className="section">
                 <div className="section-header">
                     <div>
-                        <h2 className="section-title">
-                            イベント一覧
-                            {events.length > 0 && (
-                                <span style={{ fontSize: 13, fontWeight: 400, color: '#6b7280', marginLeft: 8 }}>
-                                    {events.length} 件
-                                </span>
-                            )}
-                        </h2>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                            <h2 className="section-title" style={{ margin: 0 }}>
+                                {eventTab === 'list' ? 'イベント一覧' : 'ガントチャート'}
+                                {events.length > 0 && (
+                                    <span style={{ fontSize: 13, fontWeight: 400, color: '#6b7280', marginLeft: 8 }}>
+                                        {events.length} 件
+                                    </span>
+                                )}
+                            </h2>
+                            {/* タブ切替 */}
+                            <div style={{ display: 'flex', gap: 3 }}>
+                                <button
+                                    className={`btn btn-xs ${eventTab === 'list' ? 'btn-primary' : 'btn-secondary'}`}
+                                    onClick={() => setEventTab('list')}
+                                >
+                                    一覧
+                                </button>
+                                <button
+                                    className={`btn btn-xs ${eventTab === 'gantt' ? 'btn-primary' : 'btn-secondary'}`}
+                                    onClick={() => setEventTab('gantt')}
+                                >
+                                    ガント
+                                </button>
+                            </div>
+                        </div>
                         {/* 適用済みパターン表示 */}
                         {appliedPatternName ? (
-                            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+                            <div style={{ fontSize: 12, color: '#6b7280' }}>
                                 適用済み: {appliedPatternName}
                             </div>
                         ) : (
-                            <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>
+                            <div style={{ fontSize: 12, color: '#9ca3af' }}>
                                 パターン未適用
                             </div>
                         )}
@@ -250,6 +270,7 @@ export default function ProjectDetail() {
                                 {applyResult.restored   > 0 && ` / ${applyResult.restored} 件復元`}
                                 {applyResult.calculated > 0 && ` / ${applyResult.calculated} 件新規計算`}
                                 {applyResult.removed    > 0 && ` / ${applyResult.removed} 件除外`}
+                                {applyResult.customKept > 0 && ` / ${applyResult.customKept} 件固有保持`}
                             </div>
                         )}
                     </div>
@@ -260,7 +281,7 @@ export default function ProjectDetail() {
                         >
                             パターン適用
                         </button>
-                        {editMode && (
+                        {editMode && eventTab === 'list' && (
                             <button
                                 className="btn btn-primary btn-sm"
                                 onClick={() => setEventModal({ mode: 'create' })}
@@ -279,7 +300,12 @@ export default function ProjectDetail() {
                 {eLoading && <div className="loading-state">読み込み中…</div>}
                 {eError   && <div className="error-state">{eError}</div>}
 
-                {!eLoading && !eError && (
+                {/* ── ガントチャートタブ ── */}
+                {!eLoading && !eError && eventTab === 'gantt' && (
+                    <GanttChart events={events} />
+                )}
+
+                {!eLoading && !eError && eventTab === 'list' && (
                     <div className="table-wrap">
                         <table className="table">
                             <thead>

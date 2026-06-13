@@ -57,14 +57,23 @@ router.post('/', async (req, res, next) => {
         }
 
         // ── 3. 既存イベントを event_code でインデックス化 ────
-        // archive / DELETE の前に取得しておく
+        // is_custom = FALSE（パターン由来）のみ carry/restore 対象
+        // is_custom = TRUE の案件固有イベントはこの処理をスキップして保持する
         const { rows: existingEvents } = await client.query(
             `SELECT e.*, m.event_code
              FROM project_events e
              LEFT JOIN event_master m ON m.id = e.event_master_id
-             WHERE e.project_id = $1`,
+             WHERE e.project_id = $1 AND e.is_custom = FALSE`,
             [projectId]
         );
+
+        // 案件固有イベントの件数（パターン再適用後も保持される）
+        const { rows: customCountRows } = await client.query(
+            `SELECT COUNT(*) AS cnt FROM project_events
+             WHERE project_id = $1 AND is_custom = TRUE AND deleted_at IS NULL`,
+            [projectId]
+        );
+        const customPreservedCount = Number(customCountRows[0]?.cnt ?? 0);
         // event_code → row のマップ（null の event_code は除外）
         const existingByCode = new Map(
             existingEvents
@@ -122,8 +131,8 @@ router.post('/', async (req, res, next) => {
             archiveByCode = new Map(archiveRows.map(r => [r.source_event_code, r]));
         }
 
-        // ── 6. 全既存イベントを archive へ退避 → DELETE ──
-        // 新パターンに存在しないイベントも含め、全行を退避してから削除する
+        // ── 6. is_custom=FALSE のイベントのみ archive へ退避 → DELETE ──
+        // is_custom=TRUE の案件固有イベントは project_events に残す（削除しない）
         const { rowCount: archivedCount } = await client.query(
             `INSERT INTO project_events_archive (
                 source_project_id,
@@ -140,6 +149,8 @@ router.post('/', async (req, res, next) => {
                 owner_department,
                 updated_by,
                 event_master_id,
+                is_custom,
+                sort_order,
                 archived_reason,
                 archived_by
             )
@@ -158,16 +169,18 @@ router.post('/', async (req, res, next) => {
                 e.owner_department,
                 e.updated_by,
                 e.event_master_id,
+                e.is_custom,
+                e.sort_order,
                 'template_reapply',
                 $2
             FROM project_events e
             LEFT JOIN event_master m ON m.id = e.event_master_id
-            WHERE e.project_id = $1`,
+            WHERE e.project_id = $1 AND e.is_custom = FALSE`,
             [projectId, archivedBy]
         );
 
         await client.query(
-            'DELETE FROM project_events WHERE project_id = $1',
+            'DELETE FROM project_events WHERE project_id = $1 AND is_custom = FALSE',
             [projectId]
         );
 
@@ -250,8 +263,8 @@ router.post('/', async (req, res, next) => {
                 `INSERT INTO project_events
                     (project_id, event_master_id, event_type, event_name,
                      plan_date, actual_date, actual_date_prev1, actual_date_prev2,
-                     status, owner_department, updated_by)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                     status, owner_department, updated_by, sort_order, is_custom)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, FALSE)
                  RETURNING *`,
                 [
                     projectId,
@@ -265,6 +278,7 @@ router.post('/', async (req, res, next) => {
                     status,
                     ownerDept,
                     updatedBy,
+                    te.sort_order,
                 ]
             );
 
@@ -302,6 +316,7 @@ router.post('/', async (req, res, next) => {
             restored_count:               restoredCount,
             calculated_count:             calculatedCount,
             removed_count:                removedCount,
+            custom_preserved_count:       customPreservedCount,
             events:                       insertedEvents,
         });
 

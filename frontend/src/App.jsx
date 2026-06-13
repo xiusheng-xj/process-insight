@@ -1,10 +1,41 @@
-import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import ProjectList from './pages/ProjectList';
+import { useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, NavLink } from 'react-router-dom';
+import ProjectList   from './pages/ProjectList';
 import ProjectDetail from './pages/ProjectDetail';
+import AlarmList     from './pages/AlarmList';
+import AlertSettings from './pages/AlertSettings';
+
+function NavBar() {
+    return (
+        <nav className="nav-bar">
+            <NavLink to="/projects" className="nav-brand">工程管理</NavLink>
+            <div className="nav-links">
+                <NavLink
+                    to="/projects"
+                    className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+                >
+                    案件一覧
+                </NavLink>
+                <NavLink
+                    to="/alerts"
+                    end
+                    className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+                >
+                    アラーム
+                </NavLink>
+                <NavLink
+                    to="/alerts/settings"
+                    className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+                >
+                    アラート設定
+                </NavLink>
+            </div>
+        </nav>
+    );
+}
 
 function UsernameGate({ children }) {
-    const [name, setName] = useState(() => sessionStorage.getItem('userName') || '');
+    const [name,  setName]  = useState(() => sessionStorage.getItem('userName') || '');
     const [input, setInput] = useState('');
 
     if (name) return children;
@@ -47,10 +78,13 @@ export default function App() {
     return (
         <BrowserRouter>
             <UsernameGate>
+                <NavBar />
                 <Routes>
-                    <Route path="/" element={<Navigate to="/projects" replace />} />
-                    <Route path="/projects" element={<ProjectList />} />
-                    <Route path="/projects/:id" element={<ProjectDetail />} />
+                    <Route path="/"                  element={<Navigate to="/projects" replace />} />
+                    <Route path="/projects"          element={<ProjectList />} />
+                    <Route path="/projects/:id"      element={<ProjectDetail />} />
+                    <Route path="/alerts"            element={<AlarmList />} />
+                    <Route path="/alerts/settings"   element={<AlertSettings />} />
                 </Routes>
             </UsernameGate>
         </BrowserRouter>

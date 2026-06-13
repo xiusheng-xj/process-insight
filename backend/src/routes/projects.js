@@ -27,6 +27,20 @@ const EVENT_COUNTS_LATERAL = `
     ) ec ON TRUE
 `;
 
+/* ── スケジュール評価 LATERAL JOIN（単件取得のみ） ── */
+const SCHEDULE_EVAL_LATERAL = `
+    LEFT JOIN LATERAL (
+        SELECT
+            COUNT(*) FILTER (WHERE actual_date IS NOT NULL AND actual_date < plan_date)  AS ahead,
+            COUNT(*) FILTER (WHERE actual_date IS NOT NULL AND actual_date = plan_date)  AS on_time,
+            COUNT(*) FILTER (WHERE actual_date IS NOT NULL AND actual_date > plan_date)  AS delayed,
+            COUNT(*) FILTER (WHERE actual_date IS NULL AND plan_date < CURRENT_DATE)     AS overdue,
+            COUNT(*) FILTER (WHERE actual_date IS NULL
+                             AND (plan_date IS NULL OR plan_date >= CURRENT_DATE))       AS pending
+        FROM project_events WHERE project_id = p.id
+    ) sc ON TRUE
+`;
+
 // 一覧取得
 router.get('/', async (req, res, next) => {
     try {
@@ -90,9 +104,15 @@ router.get('/:id', async (req, res, next) => {
                      WHERE a.project_id = p.id AND a.is_resolved = FALSE) AS unresolved_alerts,
                     ec.total AS progress_total,
                     ec.done  AS progress_done,
+                    sc.ahead   AS eval_ahead,
+                    sc.on_time AS eval_on_time,
+                    sc.delayed AS eval_delayed,
+                    sc.overdue AS eval_overdue,
+                    sc.pending AS eval_pending,
                     ${EFFECTIVE_STATUS_SQL} AS effective_status
              FROM projects p
              ${EVENT_COUNTS_LATERAL}
+             ${SCHEDULE_EVAL_LATERAL}
              WHERE p.id = $1`,
             [req.params.id]
         );

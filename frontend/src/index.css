@@ -162,3 +162,41 @@ body {
 
 /* ── Pagination ── */
 .pagination { display: flex; justify-content: flex-end; padding: 12px 16px; border-top: 1px solid #f3f4f6; font-size: 13px; color: #6b7280; }
+
+/* ── Navigation bar ── */
+.nav-bar {
+  background: #1e3a5f; color: #f9fafb;
+  display: flex; align-items: center; gap: 0;
+  padding: 0 24px; height: 50px;
+  position: sticky; top: 0; z-index: 200;
+  box-shadow: 0 2px 8px rgba(0,0,0,.25);
+}
+.nav-brand {
+  font-size: 15px; font-weight: 700; color: #f9fafb;
+  text-decoration: none; margin-right: 28px; white-space: nowrap;
+}
+.nav-brand:hover { color: #fff; }
+.nav-links { display: flex; align-items: center; gap: 2px; }
+.nav-link {
+  color: #cbd5e1; font-size: 13px; font-weight: 500;
+  text-decoration: none; padding: 6px 12px; border-radius: 5px;
+  transition: background .15s, color .15s;
+}
+.nav-link:hover  { background: rgba(255,255,255,.12); color: #fff; }
+.nav-link.active { background: rgba(255,255,255,.2);  color: #fff; }
+
+/* ── Schedule summary (v1.5) ── */
+.schedule-summary {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;
+}
+.eval-chip {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 14px; border-radius: 6px;
+}
+.eval-label { font-size: 11px; font-weight: 600; }
+.eval-count { font-size: 15px; font-weight: 700; }
+.eval-ahead   { background: #dcfce7; color: #166534; }
+.eval-ontime  { background: #dbeafe; color: #1e40af; }
+.eval-delayed { background: #fed7aa; color: #9a3412; }
+.eval-overdue { background: #fee2e2; color: #991b1b; }
+.eval-pending { background: #f3f4f6; color: #6b7280; }

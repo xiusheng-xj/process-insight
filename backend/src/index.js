@@ -6,6 +6,7 @@ const errorHandler = require('./middleware/errorHandler');
 const projectsRouter      = require('./routes/projects');
 const eventsRouter        = require('./routes/events');
 const alertsRouter        = require('./routes/alerts');
+const alertsGlobalRouter  = require('./routes/alertsGlobal');
 const locksRouter         = require('./routes/locks');
 const templatesRouter     = require('./routes/templates');
 const applyTemplateRouter = require('./routes/applyTemplate');
@@ -26,7 +27,7 @@ app.use('/api/projects/:project_id/alerts',           alertsRouter);
 app.use('/api/projects/:project_id/locks',            locksRouter);
 app.use('/api/projects/:id/apply-template',           applyTemplateRouter);
 app.use('/api/templates',                             templatesRouter);
-app.use('/api/alerts/summary',                        alertsRouter);   // 全体集計専用
+app.use('/api/alerts',                                alertsGlobalRouter);
 
 app.use(errorHandler);
 

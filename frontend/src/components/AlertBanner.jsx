@@ -18,13 +18,11 @@ export default function AlertBanner({ alerts, onResolve }) {
                         </span>
                         <button
                             onClick={() => onResolve(a.id)}
-                            title="解決済みにする"
-                            style={{
-                                background: 'none', border: 'none', cursor: 'pointer',
-                                fontSize: 18, lineHeight: 1, opacity: .7, flexShrink: 0,
-                            }}
+                            title="確認済みにする"
+                            className="btn btn-xs btn-secondary"
+                            style={{ flexShrink: 0 }}
                         >
-                            ×
+                            確認済み
                         </button>
                     </div>
                 );

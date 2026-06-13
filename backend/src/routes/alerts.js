@@ -33,15 +33,16 @@ router.get('/', async (req, res, next) => {
     }
 });
 
-// アラート解決
+// アラート確認済み
 router.patch('/:id/resolve', async (req, res, next) => {
     try {
+        const resolvedBy = req.headers['x-user-name'] || req.body?.resolved_by || 'unknown';
         const { rows } = await db.query(
             `UPDATE project_alerts
-             SET is_resolved = TRUE, resolved_at = NOW()
+             SET is_resolved = TRUE, resolved_at = NOW(), resolved_by = $3
              WHERE id = $1 AND project_id = $2
              RETURNING *`,
-            [req.params.id, req.params.project_id]
+            [req.params.id, req.params.project_id, resolvedBy]
         );
         if (!rows[0]) return res.status(404).json({ error: 'アラートが見つかりません。' });
         res.json(rows[0]);

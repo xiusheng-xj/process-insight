@@ -9,6 +9,7 @@ import EventFormModal from '../components/EventFormModal';
 import ApplyPatternModal from '../components/ApplyPatternModal';
 import ProjectInfoCard from '../components/ProjectInfoCard';
 import AlertBanner from '../components/AlertBanner';
+import ScheduleSummary from '../components/ScheduleSummary';
 
 /* ── 定数 ── */
 const PROJECT_STATUS = {
@@ -184,6 +185,9 @@ export default function ProjectDetail() {
                 patterns={patterns}
                 onSaved={reloadProject}
             />
+
+            {/* ── スケジュール評価サマリー ── */}
+            <ScheduleSummary project={project} />
 
             {/* ── イベント一覧 ── */}
             <div className="section">

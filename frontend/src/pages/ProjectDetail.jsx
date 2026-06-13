@@ -14,6 +14,7 @@ import { useEvents, useEventMutations } from '../hooks/useEvents';
 import { useAlerts } from '../hooks/useAlerts';
 import { useLock } from '../hooks/useLock';
 import { fetchMilestonePatterns, applyMilestonePattern, deleteProject } from '../api/projects';
+import SaveAsPatternModal        from '../components/SaveAsPatternModal';
 import { reorderEvents } from '../api/events';
 import EventFormModal            from '../components/EventFormModal';
 import ApplyPatternModal         from '../components/ApplyPatternModal';
@@ -142,8 +143,10 @@ export default function ProjectDetail() {
     const [showDelete, setShowDelete]             = useState(false);
     const [deleting, setDeleting]                 = useState(false);
     const [eventTab, setEventTab]                 = useState('list');
-    const [showMasterSelect, setShowMasterSelect] = useState(false);
-    const [localEvents, setLocalEvents]           = useState([]);
+    const [showMasterSelect, setShowMasterSelect]   = useState(false);
+    const [showSavePattern, setShowSavePattern]     = useState(false);
+    const [savePatternResult, setSavePatternResult] = useState(null); // 保存完了メッセージ用
+    const [localEvents, setLocalEvents]             = useState([]);
 
     const { data: project, loading: pLoading, error: pError, reload: reloadProject } = useProject(id);
     const { data: events,  loading: eLoading, error: eError, reload: reloadEvents } = useEvents(id);
@@ -248,6 +251,14 @@ export default function ProjectDetail() {
     const handleAddFromMaster = useCallback(async (body) => {
         await create(body);
     }, [create]);
+
+    /* ── パターン保存完了 ── */
+    const handleSavePatternDone = useCallback((newPattern) => {
+        setShowSavePattern(false);
+        setSavePatternResult(newPattern.pattern_name);
+        fetchMilestonePatterns().then(setPatterns).catch(() => {});
+        setTimeout(() => setSavePatternResult(null), 5000);
+    }, []);
 
     /* ── イベント保存 ── */
     const handleEventSubmit = useCallback(async (body) => {
@@ -397,8 +408,21 @@ export default function ProjectDetail() {
                                 {applyResult.customKept > 0 && ` / ${applyResult.customKept} 件固有保持`}
                             </div>
                         )}
+                        {/* パターン保存完了メッセージ */}
+                        {savePatternResult && (
+                            <div style={{ fontSize: 12, color: '#059669', marginTop: 3 }}>
+                                ✓ パターン「{savePatternResult}」を保存しました
+                            </div>
+                        )}
                     </div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => setShowSavePattern(true)}
+                            title="現在のイベント構成を新規マイルストーンパターンとして保存"
+                        >
+                            構成を保存
+                        </button>
                         <button
                             className="btn btn-secondary btn-sm"
                             onClick={() => { setApplyResult(null); setPatternModal(true); }}
@@ -512,6 +536,14 @@ export default function ProjectDetail() {
                     projectEvents={events}
                     onClose={() => setShowMasterSelect(false)}
                     onAdd={handleAddFromMaster}
+                />
+            )}
+            {showSavePattern && (
+                <SaveAsPatternModal
+                    projectId={id}
+                    localEvents={localEvents}
+                    onClose={() => setShowSavePattern(false)}
+                    onSaved={handleSavePatternDone}
                 />
             )}
         </div>

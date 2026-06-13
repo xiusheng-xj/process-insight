@@ -79,6 +79,18 @@ export const fetchMilestonePatterns = async () => {
 };
 
 /**
+ * 案件イベント構成を新規パターンとして保存
+ * @param {number} projectId
+ * @param {{ pattern_name: string, pattern_code?: string, description?: string }} body
+ */
+export const saveAsPattern = async (projectId, { pattern_name, pattern_code, description }) => {
+    const res = await client.post(`/projects/${projectId}/save-as-pattern`, {
+        pattern_name, pattern_code, description,
+    });
+    return res.data;
+};
+
+/**
  * マイルストーンパターン適用
  * @param {number} projectId
  * @param {{ pattern_id: number, base_date: string }} body

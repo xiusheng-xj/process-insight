@@ -10,8 +10,9 @@ import ApplyPatternModal   from '../components/ApplyPatternModal';
 import ProjectInfoCard     from '../components/ProjectInfoCard';
 import AlertBanner         from '../components/AlertBanner';
 import ScheduleSummary     from '../components/ScheduleSummary';
-import DeleteProjectModal  from '../components/DeleteProjectModal';
-import GanttChart          from '../components/GanttChart';
+import DeleteProjectModal        from '../components/DeleteProjectModal';
+import GanttChart               from '../components/GanttChart';
+import EventMasterSelectModal   from '../components/EventMasterSelectModal';
 
 /* ── 定数 ── */
 const PROJECT_STATUS = {
@@ -48,11 +49,12 @@ function DiffCell({ diffDays, planDate, actualDate }) {
 export default function ProjectDetail() {
     const { id } = useParams();
     const navigate = useNavigate();
-    const [editMode, setEditMode]     = useState(false);
-    const [eventModal, setEventModal] = useState(null); // { mode:'create'|'edit', event? }
-    const [showDelete, setShowDelete] = useState(false);
-    const [deleting, setDeleting]     = useState(false);
-    const [eventTab, setEventTab]     = useState('list'); // 'list' | 'gantt'
+    const [editMode, setEditMode]           = useState(false);
+    const [eventModal, setEventModal]       = useState(null); // { mode:'create'|'edit', event? }
+    const [showDelete, setShowDelete]       = useState(false);
+    const [deleting, setDeleting]           = useState(false);
+    const [eventTab, setEventTab]           = useState('list'); // 'list' | 'gantt'
+    const [showMasterSelect, setShowMasterSelect] = useState(false);
 
     const { data: project, loading: pLoading, error: pError, reload: reloadProject } = useProject(id);
     const { data: events,  loading: eLoading, error: eError, reload: reloadEvents } = useEvents(id);
@@ -124,6 +126,11 @@ export default function ProjectDetail() {
             setShowDelete(false);
         }
     }, [id, navigate]);
+
+    /* ── マスターからイベント追加 ── */
+    const handleAddFromMaster = useCallback(async (body) => {
+        await create(body);
+    }, [create]);
 
     /* ── イベント保存 ── */
     const handleEventSubmit = useCallback(async (body) => {
@@ -284,7 +291,7 @@ export default function ProjectDetail() {
                         {editMode && eventTab === 'list' && (
                             <button
                                 className="btn btn-primary btn-sm"
-                                onClick={() => setEventModal({ mode: 'create' })}
+                                onClick={() => setShowMasterSelect(true)}
                                 disabled={eMutating}
                             >
                                 ＋ イベント追加
@@ -340,7 +347,12 @@ export default function ProjectDetail() {
 
                                         return (
                                             <tr key={ev.id} style={isOverdue ? { background: '#fff9f9' } : {}}>
-                                                <td style={{ fontWeight: 500 }}>{ev.event_name}</td>
+                                                <td style={{ fontWeight: 500 }}>
+                                                    {ev.event_name}
+                                                    {ev.is_custom && (
+                                                        <span style={{ marginLeft: 4, fontSize: 9, color: '#6366f1', background: '#eef2ff', borderRadius: 3, padding: '1px 4px' }}>固有</span>
+                                                    )}
+                                                </td>
                                                 <td style={{ color: '#6b7280' }}>{ev.owner_department || '—'}</td>
                                                 <td>{ev.plan_date ? ev.plan_date.slice(0, 10) : '—'}</td>
                                                 <td>
@@ -418,6 +430,13 @@ export default function ProjectDetail() {
                     onClose={() => setShowDelete(false)}
                     onConfirm={handleDelete}
                     loading={deleting}
+                />
+            )}
+            {showMasterSelect && (
+                <EventMasterSelectModal
+                    projectEvents={events}
+                    onClose={() => setShowMasterSelect(false)}
+                    onAdd={handleAddFromMaster}
                 />
             )}
         </div>

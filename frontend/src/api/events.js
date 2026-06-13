@@ -55,3 +55,13 @@ export const updateEvent = async (projectId, eventId, body) => {
 export const deleteEvent = async (projectId, eventId) => {
     await client.delete(`/projects/${projectId}/events/${eventId}`);
 };
+
+/**
+ * イベントマスター一覧取得
+ * @param {{ event_type?: string }} params
+ * @returns {EventMaster[]}
+ */
+export const fetchEventMasters = async (params = {}) => {
+    const res = await client.get('/event-master', { params });
+    return res.data;
+};

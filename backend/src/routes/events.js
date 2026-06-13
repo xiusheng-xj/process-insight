@@ -57,7 +57,8 @@ router.get('/:id', async (req, res, next) => {
 router.post('/', async (req, res, next) => {
     try {
         const { project_id } = req.params;
-        const { event_type, event_name, plan_date, actual_date, status, owner_department, updated_by } = req.body;
+        const { event_type, event_name, plan_date, actual_date, status,
+                owner_department, updated_by, event_master_id } = req.body;
 
         if (!event_type || !event_name) {
             return res.status(400).json({ error: 'event_type と event_name は必須です。' });
@@ -73,11 +74,12 @@ router.post('/', async (req, res, next) => {
 
         const { rows } = await db.query(
             `INSERT INTO project_events
-                (project_id, event_type, event_name, plan_date, actual_date,
+                (project_id, event_master_id, event_type, event_name, plan_date, actual_date,
                  status, owner_department, updated_by, is_custom, sort_order)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8, TRUE, $9)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, TRUE, $10)
              RETURNING *`,
-            [project_id, event_type, event_name, plan_date || null, actual_date || null,
+            [project_id, event_master_id || null, event_type, event_name,
+             plan_date || null, actual_date || null,
              status ?? 'pending', owner_department, updated_by, nextSortOrder]
         );
 

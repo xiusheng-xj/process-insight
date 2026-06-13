@@ -9,7 +9,7 @@ const client = axios.create({
 // ログインユーザー名をヘッダーに付与（編集ロック判定に使用）
 client.interceptors.request.use((config) => {
     const userName = sessionStorage.getItem('userName') || 'anonymous';
-    config.headers['x-user-name'] = userName;
+    config.headers['x-user-name'] = encodeURIComponent(userName);
     return config;
 });
 

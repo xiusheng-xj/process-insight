@@ -14,8 +14,15 @@ import { useEvents, useEventMutations } from '../hooks/useEvents';
 import { useAlerts } from '../hooks/useAlerts';
 import { useLock } from '../hooks/useLock';
 import { fetchMilestonePatterns, applyMilestonePattern, deleteProject } from '../api/projects';
+import {
+    fetchProjectProcessSteps,
+    deleteProjectProcessStep,
+} from '../api/processPatterns';
 import SaveAsPatternModal        from '../components/SaveAsPatternModal';
-import { reorderEvents } from '../api/events';
+import ProcessStepModal          from '../components/ProcessStepModal';
+import ProcessStepEditModal      from '../components/ProcessStepEditModal';
+import SaveProcessPatternModal   from '../components/SaveProcessPatternModal';
+import { reorderEvents }         from '../api/events';
 import EventFormModal            from '../components/EventFormModal';
 import ApplyPatternModal         from '../components/ApplyPatternModal';
 import ProjectInfoCard           from '../components/ProjectInfoCard';
@@ -41,6 +48,8 @@ const EVENT_STATUS = {
     delayed:     { label: '遅延',   cls: 'badge-delayed' },
 };
 
+const DEPT_LABEL = { A: 'A部門', SELF: '自部門', B: 'B部門', C: 'C部門', D: 'D部門' };
+
 /* ── 差異表示 ── */
 function DiffCell({ diffDays, planDate, actualDate }) {
     if (actualDate == null && planDate) {
@@ -53,21 +62,123 @@ function DiffCell({ diffDays, planDate, actualDate }) {
     if (diffDays == null)   return <span className="diff diff-ontime">—</span>;
     if (diffDays < 0)       return <span className="diff diff-early">{diffDays}日（前倒）</span>;
     if (diffDays === 0)     return <span className="diff diff-ontime">±0日</span>;
-    return <span className="diff diff-late">+{diffDays}日</span>;
+    return <span className="diff diff-late">+{diffDays}日（遅延）</span>;
+}
+
+/* ── 工程ステップ 差異表示 ── */
+function StepDiffCell({ diffDays, latestActualDate }) {
+    if (!latestActualDate) return <span style={{ color: '#9ca3af' }}>—</span>;
+    if (diffDays == null)  return <span style={{ color: '#9ca3af' }}>—</span>;
+    if (diffDays < 0)  return <span style={{ color: '#059669' }}>{diffDays}日（前倒し）</span>;
+    if (diffDays === 0) return <span style={{ color: '#6b7280' }}>0日（計画通り）</span>;
+    return <span style={{ color: '#dc2626' }}>+{diffDays}日（遅延）</span>;
+}
+
+/* ── 工程ステップ サブ行（マイルストーン行と列を揃える） ── */
+function ProcessStepSubRow({ step, editMode, onDelete, onEdit }) {
+    const isDone = !!step.latest_actual_date;
+    const cell = {
+        borderBottom: '1px solid #e0f2fe',
+        background: '#f0f9ff',
+        fontSize: 12,
+        paddingTop: 5,
+        paddingBottom: 5,
+    };
+
+    return (
+        <tr>
+            {/* ドラッグ列の代わりにインデント記号 */}
+            {editMode && (
+                <td style={{ ...cell, textAlign: 'center', color: '#93c5fd', fontSize: 13 }}>
+                    └
+                </td>
+            )}
+            {/* 工程名 */}
+            <td style={{ ...cell, paddingLeft: editMode ? 10 : 28 }}>
+                {!editMode && <span style={{ color: '#93c5fd', marginRight: 4 }}>└</span>}
+                <span style={{ fontWeight: 500, color: isDone ? '#94a3b8' : '#374151' }}>
+                    {step.process_name}
+                </span>
+                {step.is_custom && (
+                    <span style={{ marginLeft: 4, fontSize: 9, color: '#6366f1', background: '#eef2ff', borderRadius: 3, padding: '1px 4px' }}>
+                        カスタム
+                    </span>
+                )}
+            </td>
+            {/* 担当部門 */}
+            <td style={{ ...cell, color: '#6b7280' }}>
+                {DEPT_LABEL[step.department_code] || step.department_code || '—'}
+            </td>
+            {/* 予定日 */}
+            <td style={cell}>
+                {step.plan_date ? step.plan_date.slice(0, 10) : '—'}
+            </td>
+            {/* 最新実績 */}
+            <td style={{ ...cell, color: isDone ? '#059669' : '#9ca3af' }}>
+                {step.latest_actual_date ? step.latest_actual_date.slice(0, 10) : '未入力'}
+            </td>
+            {/* 前回実績 */}
+            <td style={{ ...cell, color: '#6b7280', fontSize: 11 }}>
+                {step.previous_actual_date ? step.previous_actual_date.slice(0, 10) : '—'}
+            </td>
+            {/* 前々回実績 */}
+            <td style={{ ...cell, color: '#9ca3af', fontSize: 11 }}>
+                {step.pre_previous_actual_date ? step.pre_previous_actual_date.slice(0, 10) : '—'}
+            </td>
+            {/* 差異 */}
+            <td style={cell}>
+                <StepDiffCell diffDays={step.diff_days} latestActualDate={step.latest_actual_date} />
+            </td>
+            {/* 状態バッジ (latest_actual_date の有無で判定) */}
+            <td style={cell}>
+                <span style={{
+                    fontSize: 10, borderRadius: 3, padding: '1px 6px',
+                    background: isDone ? '#d1fae5' : '#f3f4f6',
+                    color:      isDone ? '#059669' : '#6b7280',
+                }}>
+                    {isDone ? '完了' : '未完了'}
+                </span>
+            </td>
+            {/* 操作: 編集・削除のみ */}
+            {editMode && (
+                <td style={cell}>
+                    <div className="btn-group">
+                        <button
+                            className="btn btn-ghost btn-xs"
+                            style={{ fontSize: 11, color: '#6b7280' }}
+                            onClick={() => onEdit(step)}
+                        >
+                            編集
+                        </button>
+                        <button
+                            className="btn btn-ghost btn-xs"
+                            style={{ fontSize: 11, color: '#dc2626' }}
+                            onClick={() => onDelete(step)}
+                        >
+                            削除
+                        </button>
+                    </div>
+                </td>
+            )}
+        </tr>
+    );
 }
 
 /* ── ソート可能イベント行 ── */
-function SortableRow({ ev, editMode, eMutating, onEdit, onDelete }) {
+function SortableRow({ ev, editMode, eMutating, onEdit, onDelete, stepCount, isStepsExpanded, onToggleSteps, onManageSteps }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: ev.id });
 
     const esi = EVENT_STATUS[ev.status] || { label: ev.status, cls: 'badge-pending' };
     const isOverdue = !ev.actual_date && ev.plan_date && new Date(ev.plan_date) < new Date();
+    const hasSteps  = stepCount > 0;
 
     const rowStyle = {
         transform: CSS.Transform.toString(transform),
         transition,
         ...(isDragging
             ? { background: '#eff6ff', opacity: 0.85, boxShadow: '0 4px 14px rgba(0,0,0,0.1)', position: 'relative', zIndex: 10 }
+            : hasSteps
+            ? { background: '#eff6ff', borderLeft: '3px solid #3b82f6' }
             : isOverdue
             ? { background: '#fff9f9' }
             : {}),
@@ -87,10 +198,27 @@ function SortableRow({ ev, editMode, eMutating, onEdit, onDelete }) {
                 </td>
             )}
             <td style={{ fontWeight: 500 }}>
-                {ev.event_name}
-                {ev.is_custom && (
-                    <span style={{ marginLeft: 4, fontSize: 9, color: '#6366f1', background: '#eef2ff', borderRadius: 3, padding: '1px 4px' }}>固有</span>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>
+                        {ev.event_name}
+                        {ev.is_custom && (
+                            <span style={{ marginLeft: 4, fontSize: 9, color: '#6366f1', background: '#eef2ff', borderRadius: 3, padding: '1px 4px' }}>固有</span>
+                        )}
+                    </span>
+                    <button
+                        onClick={onToggleSteps}
+                        style={{
+                            fontSize: 10, background: 'none', cursor: 'pointer', padding: '1px 5px',
+                            border:       `1px solid ${hasSteps ? '#93c5fd' : '#d1d5db'}`,
+                            borderRadius: 3,
+                            color:        hasSteps ? '#2563eb' : '#9ca3af',
+                            whiteSpace:   'nowrap',
+                            fontWeight:   hasSteps ? 600 : 400,
+                        }}
+                    >
+                        {isStepsExpanded ? '▲' : '▼'} 工程{hasSteps ? `(${stepCount})` : ''}
+                    </button>
+                </div>
             </td>
             <td style={{ color: '#6b7280' }}>{ev.owner_department || '—'}</td>
             <td>{ev.plan_date ? ev.plan_date.slice(0, 10) : '—'}</td>
@@ -121,6 +249,15 @@ function SortableRow({ ev, editMode, eMutating, onEdit, onDelete }) {
                         </button>
                         <button
                             className="btn btn-ghost btn-xs"
+                            style={{ color: '#6366f1' }}
+                            onClick={onManageSteps}
+                            disabled={eMutating}
+                            title="工程パターンを適用"
+                        >
+                            工程
+                        </button>
+                        <button
+                            className="btn btn-ghost btn-xs"
                             style={{ color: '#dc2626' }}
                             onClick={() => onDelete(ev)}
                             disabled={eMutating}
@@ -145,8 +282,15 @@ export default function ProjectDetail() {
     const [eventTab, setEventTab]                 = useState('list');
     const [showMasterSelect, setShowMasterSelect]   = useState(false);
     const [showSavePattern, setShowSavePattern]     = useState(false);
-    const [savePatternResult, setSavePatternResult] = useState(null); // 保存完了メッセージ用
+    const [savePatternResult, setSavePatternResult] = useState(null);
     const [localEvents, setLocalEvents]             = useState([]);
+
+    // 工程ステップ関連
+    const [processStepsMap, setProcessStepsMap]         = useState({});
+    const [expandedStepRows, setExpandedStepRows]       = useState(new Set());
+    const [processStepModal, setProcessStepModal]       = useState(null); // { event, initialTab? }
+    const [saveProcessPatModal, setSaveProcessPatModal] = useState(null); // { event }
+    const [editStepModal, setEditStepModal]             = useState(null); // step object
 
     const { data: project, loading: pLoading, error: pError, reload: reloadProject } = useProject(id);
     const { data: events,  loading: eLoading, error: eError, reload: reloadEvents } = useEvents(id);
@@ -158,17 +302,34 @@ export default function ProjectDetail() {
     const [patterns, setPatterns]         = useState([]);
     const [patternModal, setPatternModal] = useState(false);
     const [applyLoading, setApplyLoading] = useState(false);
-    const [applyResult, setApplyResult]   = useState(null); // { generated, archived }
+    const [applyResult, setApplyResult]   = useState(null);
 
     /* ── サーバー取得イベントをローカル状態に同期 ── */
     useEffect(() => { setLocalEvents(events); }, [events]);
 
-    /* ── DnD センサー（5px 以上移動でドラッグ開始） ── */
+    /* ── 工程ステップ読み込み ── */
+    const loadProcessSteps = useCallback(() => {
+        if (!id) return;
+        fetchProjectProcessSteps(id)
+            .then(steps => {
+                const map = {};
+                for (const s of steps) {
+                    if (!map[s.parent_event_id]) map[s.parent_event_id] = [];
+                    map[s.parent_event_id].push(s);
+                }
+                setProcessStepsMap(map);
+            })
+            .catch(() => {});
+    }, [id]);
+
+    useEffect(() => { loadProcessSteps(); }, [loadProcessSteps]);
+
+    /* ── DnD センサー ── */
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
     );
 
-    /* ── 並び替え保存（一覧タブ・ガントタブ共通） ── */
+    /* ── 並び替え保存 ── */
     const saveReorder = useCallback(async (newOrder) => {
         setLocalEvents(newOrder);
         const payload = newOrder.map((e, i) => ({ id: e.id, sort_order: (i + 1) * 10 }));
@@ -176,12 +337,12 @@ export default function ProjectDetail() {
             await reorderEvents(id, payload);
             reloadEvents();
         } catch {
-            setLocalEvents(events); // 失敗時はロールバック
+            setLocalEvents(events);
             alert('並び替えの保存に失敗しました。');
         }
     }, [events, id, reloadEvents]);
 
-    /* ── 一覧タブ DnD 完了 ── */
+    /* ── DnD 完了 ── */
     const handleDragEnd = useCallback(async ({ active, over }) => {
         if (!over || active.id === over.id) return;
         const oldIdx = localEvents.findIndex(e => e.id === active.id);
@@ -214,14 +375,13 @@ export default function ProjectDetail() {
         setApplyLoading(true);
         try {
             const result = await applyMilestonePattern(id, { pattern_id, base_date });
-            console.log('[pattern-apply] 完了:', result);
             setApplyResult({
                 generated:   result.event_count,
                 archived:    result.archived_count,
-                carried:     result.carried_count         ?? 0,
-                restored:    result.restored_count        ?? 0,
-                calculated:  result.calculated_count      ?? 0,
-                removed:     result.removed_count         ?? 0,
+                carried:     result.carried_count          ?? 0,
+                restored:    result.restored_count         ?? 0,
+                calculated:  result.calculated_count       ?? 0,
+                removed:     result.removed_count          ?? 0,
                 customKept:  result.custom_preserved_count ?? 0,
             });
             setPatternModal(false);
@@ -279,6 +439,33 @@ export default function ProjectDetail() {
         await remove(ev.id);
     }, [remove]);
 
+    /* ── 工程ステップ 展開/折りたたみ ── */
+    const toggleStepExpand = useCallback((eventId) => {
+        setExpandedStepRows(prev => {
+            const s = new Set(prev);
+            s.has(eventId) ? s.delete(eventId) : s.add(eventId);
+            return s;
+        });
+    }, []);
+
+    /* ── 工程ステップ 削除 ── */
+    const handleDeleteProcessStep = useCallback(async (step) => {
+        if (!window.confirm(`「${step.process_name}」を削除しますか？`)) return;
+        try {
+            await deleteProjectProcessStep(id, step.id);
+            loadProcessSteps();
+        } catch (err) {
+            alert(err?.data?.message || err?.message || '工程ステップの削除に失敗しました。');
+        }
+    }, [id, loadProcessSteps]);
+
+    /* ── 工程ステップ 編集モーダル ── */
+    const handleEditStep  = useCallback((step) => setEditStepModal(step), []);
+    const handleSaveStep  = useCallback(() => {
+        setEditStepModal(null);
+        loadProcessSteps();
+    }, [loadProcessSteps]);
+
     /* ── ローディング / エラー ── */
     if (pLoading) return <div className="page"><div className="loading-state">読み込み中…</div></div>;
     if (pError)   return (
@@ -295,6 +482,8 @@ export default function ProjectDetail() {
     );
 
     const psi = PROJECT_STATUS[project.effective_status] || { label: project.effective_status, cls: 'badge-pending' };
+    // 列数: edit=10 (drag+8data+actions), view=8
+    const colCount = editMode ? 10 : 8;
 
     return (
         <div className="page">
@@ -373,7 +562,6 @@ export default function ProjectDetail() {
                                     </span>
                                 )}
                             </h2>
-                            {/* タブ切替 */}
                             <div style={{ display: 'flex', gap: 3 }}>
                                 <button
                                     className={`btn btn-xs ${eventTab === 'list' ? 'btn-primary' : 'btn-secondary'}`}
@@ -389,7 +577,6 @@ export default function ProjectDetail() {
                                 </button>
                             </div>
                         </div>
-                        {/* 適用済みパターン表示 */}
                         {appliedPatternName ? (
                             <div style={{ fontSize: 12, color: '#6b7280' }}>
                                 適用済み: {appliedPatternName}
@@ -399,7 +586,6 @@ export default function ProjectDetail() {
                                 パターン未適用
                             </div>
                         )}
-                        {/* 適用完了メッセージ */}
                         {applyResult && (
                             <div style={{ fontSize: 12, color: '#059669', marginTop: 3 }}>
                                 ✓ 適用完了 — {applyResult.generated} 件生成
@@ -410,7 +596,6 @@ export default function ProjectDetail() {
                                 {applyResult.customKept > 0 && ` / ${applyResult.customKept} 件固有保持`}
                             </div>
                         )}
-                        {/* パターン保存完了メッセージ */}
                         {savePatternResult && (
                             <div style={{ fontSize: 12, color: '#059669', marginTop: 3 }}>
                                 ✓ パターン「{savePatternResult}」を保存しました
@@ -418,13 +603,15 @@ export default function ProjectDetail() {
                         )}
                     </div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <button
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => setShowSavePattern(true)}
-                            title="現在のイベント構成を新規マイルストーンパターンとして保存"
-                        >
-                            構成を保存
-                        </button>
+                        {editMode && (
+                            <button
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => setShowSavePattern(true)}
+                                title="現在のイベント構成を新規マイルストーンパターンとして保存"
+                            >
+                                構成を保存
+                            </button>
+                        )}
                         <button
                             className="btn btn-secondary btn-sm"
                             onClick={() => { setApplyResult(null); setPatternModal(true); }}
@@ -454,6 +641,7 @@ export default function ProjectDetail() {
                 {!eLoading && !eError && eventTab === 'gantt' && (
                     <GanttChart
                         events={localEvents}
+                        processStepsMap={processStepsMap}
                         editMode={editMode}
                         onReorder={saveReorder}
                     />
@@ -476,13 +664,13 @@ export default function ProjectDetail() {
                                             <th>前々回実績</th>
                                             <th>差異</th>
                                             <th>状態</th>
-                                            {editMode && <th style={{ width: 100 }}>操作</th>}
+                                            {editMode && <th style={{ width: 110 }}>操作</th>}
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {localEvents.length === 0 ? (
                                             <tr>
-                                                <td colSpan={editMode ? 10 : 8}>
+                                                <td colSpan={colCount}>
                                                     <div className="empty-state">
                                                         {editMode
                                                             ? '「＋ イベント追加」からイベントを登録してください'
@@ -491,16 +679,90 @@ export default function ProjectDetail() {
                                                 </td>
                                             </tr>
                                         ) : (
-                                            localEvents.map((ev) => (
-                                                <SortableRow
-                                                    key={ev.id}
-                                                    ev={ev}
-                                                    editMode={editMode}
-                                                    eMutating={eMutating}
-                                                    onEdit={(e) => setEventModal({ mode: 'edit', event: e })}
-                                                    onDelete={handleDeleteEvent}
-                                                />
-                                            ))
+                                            localEvents.flatMap((ev) => {
+                                                const steps      = processStepsMap[ev.id] || [];
+                                                const isExpanded = expandedStepRows.has(ev.id);
+                                                const subColSpan = colCount - (editMode ? 2 : 0);
+                                                const rows = [
+                                                    <SortableRow
+                                                        key={ev.id}
+                                                        ev={ev}
+                                                        editMode={editMode}
+                                                        eMutating={eMutating}
+                                                        stepCount={steps.length}
+                                                        isStepsExpanded={isExpanded}
+                                                        onToggleSteps={() => toggleStepExpand(ev.id)}
+                                                        onManageSteps={() => setProcessStepModal({ event: ev, initialTab: 'apply' })}
+                                                        onEdit={(e) => setEventModal({ mode: 'edit', event: e })}
+                                                        onDelete={handleDeleteEvent}
+                                                    />,
+                                                ];
+
+                                                if (isExpanded) {
+                                                    if (steps.length === 0) {
+                                                        rows.push(
+                                                            <tr key={`empty-steps-${ev.id}`} style={{ background: '#f0f9ff' }}>
+                                                                {editMode && <td style={{ borderBottom: '1px solid #e0f2fe' }} />}
+                                                                <td colSpan={subColSpan} style={{
+                                                                    paddingLeft: 40, fontSize: 12, color: '#9ca3af',
+                                                                    paddingTop: 6, paddingBottom: 6,
+                                                                    borderBottom: '1px solid #e0f2fe',
+                                                                }}>
+                                                                    工程ステップなし
+                                                                </td>
+                                                                {editMode && <td style={{ borderBottom: '1px solid #e0f2fe' }} />}
+                                                            </tr>
+                                                        );
+                                                    } else {
+                                                        steps.forEach(s => {
+                                                            rows.push(
+                                                                <ProcessStepSubRow
+                                                                    key={`s-${s.id}`}
+                                                                    step={s}
+                                                                    editMode={editMode}
+                                                                    onDelete={handleDeleteProcessStep}
+                                                                    onEdit={handleEditStep}
+                                                                />
+                                                            );
+                                                        });
+                                                    }
+
+                                                    // 展開時のアクション行（edit モードのみ）
+                                                    if (editMode) {
+                                                        rows.push(
+                                                            <tr key={`step-actions-${ev.id}`} style={{ background: '#f0f9ff' }}>
+                                                                <td style={{ borderBottom: '1px solid #bfdbfe' }} />
+                                                                <td colSpan={subColSpan} style={{
+                                                                    paddingLeft: 40, paddingTop: 6, paddingBottom: 8,
+                                                                    borderBottom: '1px solid #bfdbfe',
+                                                                }}>
+                                                                    <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+                                                                        <button
+                                                                            className="btn btn-ghost btn-xs"
+                                                                            style={{ color: '#6366f1', fontSize: 12 }}
+                                                                            onClick={() => setProcessStepModal({ event: ev, initialTab: 'custom' })}
+                                                                        >
+                                                                            ＋ 任意工程を追加
+                                                                        </button>
+                                                                        {steps.length > 0 && (
+                                                                            <button
+                                                                                className="btn btn-ghost btn-xs"
+                                                                                style={{ color: '#6b7280', fontSize: 12 }}
+                                                                                onClick={() => setSaveProcessPatModal({ event: ev })}
+                                                                            >
+                                                                                工程パターンとして保存
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                                <td style={{ borderBottom: '1px solid #bfdbfe' }} />
+                                                            </tr>
+                                                        );
+                                                    }
+                                                }
+
+                                                return rows;
+                                            })
                                         )}
                                     </tbody>
                                 </table>
@@ -550,6 +812,33 @@ export default function ProjectDetail() {
                     localEvents={localEvents}
                     onClose={() => setShowSavePattern(false)}
                     onSaved={handleSavePatternDone}
+                />
+            )}
+            {processStepModal && (
+                <ProcessStepModal
+                    projectId={id}
+                    event={processStepModal.event}
+                    initialTab={processStepModal.initialTab || 'apply'}
+                    onClose={() => setProcessStepModal(null)}
+                    onApplied={() => { loadProcessSteps(); setProcessStepModal(null); }}
+                    onAdded={() => { loadProcessSteps(); }}
+                />
+            )}
+            {saveProcessPatModal && (
+                <SaveProcessPatternModal
+                    projectId={id}
+                    event={saveProcessPatModal.event}
+                    steps={processStepsMap[saveProcessPatModal.event.id] || []}
+                    onClose={() => setSaveProcessPatModal(null)}
+                    onSaved={() => { setSaveProcessPatModal(null); }}
+                />
+            )}
+            {editStepModal && (
+                <ProcessStepEditModal
+                    step={editStepModal}
+                    projectId={id}
+                    onClose={() => setEditStepModal(null)}
+                    onSaved={handleSaveStep}
                 />
             )}
         </div>

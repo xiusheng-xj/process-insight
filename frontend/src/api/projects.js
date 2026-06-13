@@ -80,13 +80,48 @@ export const fetchMilestonePatterns = async () => {
 
 /**
  * 案件イベント構成を新規パターンとして保存
- * @param {number} projectId
- * @param {{ pattern_name: string, pattern_code?: string, description?: string }} body
+ * axios interceptor が error body を捨てるため fetch で直接呼ぶ。
+ * 非 2xx 時は err.status / err.error / err.existing_pattern を持つ Error を throw する。
  */
 export const saveAsPattern = async (projectId, { pattern_name, pattern_code, description }) => {
-    const res = await client.post(`/projects/${projectId}/save-as-pattern`, {
-        pattern_name, pattern_code, description,
-    });
+    const base     = import.meta.env.VITE_API_BASE_URL || 'http://localhost:6101/api';
+    const userName = encodeURIComponent(sessionStorage.getItem('userName') || 'anonymous');
+
+    let res;
+    try {
+        res = await fetch(`${base}/projects/${projectId}/save-as-pattern`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json', 'x-user-name': userName },
+            body: JSON.stringify({ pattern_name, pattern_code, description }),
+        });
+    } catch {
+        const err = new Error('保存処理を開始できませんでした。ユーザー名または通信設定を確認してください。');
+        err.status = 0;
+        throw err;
+    }
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+        const err = new Error(
+            data.message || data.error || `保存に失敗しました。（HTTP ${res.status}）`
+        );
+        err.status           = res.status;
+        err.error            = data.error;
+        err.existing_pattern = data.existing_pattern;
+        err.data             = data;
+        throw err;
+    }
+
+    return data;
+};
+
+/**
+ * プログラムガント用案件一覧取得
+ * @param {{ status?: string, health_status?: string, search?: string }} params
+ */
+export const fetchProjectsGantt = async (params = {}) => {
+    const res = await client.get('/projects/gantt', { params });
     return res.data;
 };
 

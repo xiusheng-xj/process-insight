@@ -90,11 +90,13 @@ router.post('/', async (req, res, next) => {
     try {
         const { project_id } = req.params;
         const { event_type, event_name, plan_date, actual_date, status,
-                owner_department, updated_by, event_master_id } = req.body;
+                owner_department, updated_by, event_master_id, notes } = req.body;
 
-        if (!event_type || !event_name) {
-            return res.status(400).json({ error: 'event_type と event_name は必須です。' });
+        if (!event_name) {
+            return res.status(400).json({ error: 'event_name は必須です。' });
         }
+        // カテゴリ未指定時は 'other' を使用
+        const eventTypeVal = (event_type && event_type.trim()) ? event_type.trim() : 'other';
 
         // sort_order = 既存の最大値 + 10（カスタムイベントは末尾に追加）
         const { rows: soRows } = await db.query(
@@ -107,12 +109,13 @@ router.post('/', async (req, res, next) => {
         const { rows } = await db.query(
             `INSERT INTO project_events
                 (project_id, event_master_id, event_type, event_name, plan_date, actual_date,
-                 status, owner_department, updated_by, is_custom, sort_order)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, TRUE, $10)
+                 status, owner_department, updated_by, is_custom, sort_order, notes)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, TRUE, $10, $11)
              RETURNING *`,
-            [project_id, event_master_id || null, event_type, event_name,
+            [project_id, event_master_id || null, eventTypeVal, event_name,
              plan_date || null, actual_date || null,
-             status ?? 'pending', owner_department, updated_by, nextSortOrder]
+             status ?? 'pending', owner_department || null, updated_by || null,
+             nextSortOrder, notes || null]
         );
 
         // 実績日入力時にアラート自動解決
@@ -136,7 +139,8 @@ router.put('/:id', async (req, res, next) => {
     try {
         await client.query('BEGIN');
 
-        const { event_type, event_name, plan_date, actual_date, status, owner_department, updated_by } = req.body;
+        const { event_type, event_name, plan_date, actual_date, status,
+                owner_department, updated_by, notes } = req.body;
         const newActual = actual_date || null;
 
         // 3世代シフトロジック:
@@ -153,11 +157,13 @@ router.put('/:id', async (req, res, next) => {
                 plan_date        = COALESCE($3, plan_date),
                 status           = COALESCE($5, status),
                 owner_department = COALESCE($6, owner_department),
-                updated_by       = COALESCE($7, updated_by)
+                updated_by       = COALESCE($7, updated_by),
+                notes            = COALESCE($10, notes)
              WHERE id = $8 AND project_id = $9
              RETURNING *`,
             [event_type, event_name, plan_date || null, newActual,
-             status, owner_department, updated_by, req.params.id, req.params.project_id]
+             status, owner_department, updated_by, req.params.id, req.params.project_id,
+             notes || null]
         );
         if (!rows[0]) {
             await client.query('ROLLBACK');
@@ -175,12 +181,18 @@ router.put('/:id', async (req, res, next) => {
             );
         }
 
-        // 遅延チェック: 予定比 diff_days が設定値を超えたらアラート生成
+        // 遅延チェック: 予定比 diff_days が設定値を超えたらアラート生成（重複防止）
         if (updated.diff_days !== null && updated.diff_days > 3) {
             await client.query(
                 `INSERT INTO project_alerts (project_id, event_id, alert_type, severity, message)
-                 VALUES ($1, $2, 'delay', 'warning', $3)
-                 ON CONFLICT DO NOTHING`,
+                 SELECT $1, $2, 'delay', 'warning', $3
+                 WHERE NOT EXISTS (
+                     SELECT 1 FROM project_alerts
+                     WHERE project_id = $1
+                       AND event_id = $2
+                       AND alert_type = 'delay'
+                       AND is_resolved = FALSE
+                 )`,
                 [updated.project_id, updated.id,
                  `「${updated.event_name}」が予定より ${updated.diff_days} 日遅延しています。`]
             );

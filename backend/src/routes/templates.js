@@ -10,7 +10,7 @@ router.get('/', async (req, res, next) => {
     try {
         const { machine_type } = req.query;
         const params = [];
-        const where  = ['t.is_active = TRUE'];
+        const where  = ['t.is_active = TRUE', 't.deleted_at IS NULL'];
 
         if (machine_type) {
             params.push(machine_type);

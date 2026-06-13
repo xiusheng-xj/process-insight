@@ -2,9 +2,12 @@ import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, NavLink } from 'react-router-dom';
 import ProjectList   from './pages/ProjectList';
 import ProjectDetail from './pages/ProjectDetail';
-import AlarmList     from './pages/AlarmList';
-import AlertSettings from './pages/AlertSettings';
-import TrashList     from './pages/TrashList';
+import ProjectGantt  from './pages/ProjectGantt';
+import AlarmList            from './pages/AlarmList';
+import AlertSettings        from './pages/AlertSettings';
+import TrashList            from './pages/TrashList';
+import ProcessPatternAdmin     from './pages/ProcessPatternAdmin';
+import MilestonePatternAdmin  from './pages/MilestonePatternAdmin';
 
 function NavBar() {
     return (
@@ -24,6 +27,12 @@ function NavBar() {
                     ゴミ箱
                 </NavLink>
                 <NavLink
+                    to="/gantt"
+                    className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+                >
+                    プログラムガント
+                </NavLink>
+                <NavLink
                     to="/alerts"
                     end
                     className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
@@ -35,6 +44,18 @@ function NavBar() {
                     className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
                 >
                     アラート設定
+                </NavLink>
+                <NavLink
+                    to="/process-patterns"
+                    className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+                >
+                    工程パターン
+                </NavLink>
+                <NavLink
+                    to="/milestone-patterns"
+                    className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+                >
+                    マイルストーンパターン
                 </NavLink>
             </div>
         </nav>
@@ -89,10 +110,13 @@ export default function App() {
                 <Routes>
                     <Route path="/"                  element={<Navigate to="/projects" replace />} />
                     <Route path="/projects"          element={<ProjectList />} />
+                    <Route path="/gantt"             element={<ProjectGantt />} />
                     <Route path="/projects/:id"      element={<ProjectDetail />} />
                     <Route path="/trash"              element={<TrashList />} />
                     <Route path="/alerts"            element={<AlarmList />} />
                     <Route path="/alerts/settings"   element={<AlertSettings />} />
+                    <Route path="/process-patterns"    element={<ProcessPatternAdmin />} />
+                    <Route path="/milestone-patterns" element={<MilestonePatternAdmin />} />
                 </Routes>
             </UsernameGate>
         </BrowserRouter>

@@ -20,11 +20,13 @@ const HEALTH_STATUS_MAP = {
 
 const MANUAL_STATUSES = new Set(['on_hold', 'cancelled']);
 
-const fmtDate = (dt) => {
-    if (!dt) return '—';
-    const d = new Date(dt);
-    return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
-};
+function RemainingDays({ days }) {
+    if (days == null) return <span style={{ color: '#9ca3af' }}>—</span>;
+    const n = Number(days);
+    if (n > 3)  return <span style={{ color: '#059669', fontSize: 13 }}>あと{n}日</span>;
+    if (n >= 0) return <span style={{ color: '#d97706', fontSize: 13, fontWeight: 600 }}>{n === 0 ? '今日' : `あと${n}日`}</span>;
+    return <span style={{ color: '#dc2626', fontSize: 13, fontWeight: 600 }}>超過{Math.abs(n)}日</span>;
+}
 
 export default function ProjectList() {
     const navigate = useNavigate();
@@ -75,6 +77,9 @@ export default function ProjectList() {
                     <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
                         ＋ 新規案件
                     </button>
+                    <Link to="/gantt" className="btn btn-secondary">
+                        プログラムガント
+                    </Link>
                 </div>
             </div>
 
@@ -111,7 +116,8 @@ export default function ProjectList() {
                                     <th>状態</th>
                                     <th>健全性</th>
                                     <th style={{ textAlign: 'center' }}>アラーム</th>
-                                    <th>最終更新日</th>
+                                    <th>次イベント</th>
+                                    <th>残日数</th>
                                     <th>ロック状態</th>
                                     <th style={{ width: 56 }}></th>
                                 </tr>
@@ -119,7 +125,7 @@ export default function ProjectList() {
                             <tbody>
                                 {data.length === 0 ? (
                                     <tr>
-                                        <td colSpan={8}>
+                                        <td colSpan={9}>
                                             <div className="empty-state">案件がありません</div>
                                         </td>
                                     </tr>
@@ -158,8 +164,17 @@ export default function ProjectList() {
                                                         {alarmCount}件
                                                     </span>
                                                 </td>
-                                                <td style={{ fontSize: 13, color: '#6b7280' }}>
-                                                    {fmtDate(p.updated_at)}
+                                                <td style={{ fontSize: 13 }}>
+                                                    {p.next_event_name
+                                                        ? p.next_event_name
+                                                        : <span style={{ color: '#9ca3af' }}>
+                                                            {p.effective_status === 'completed' ? '完了' : '—'}
+                                                          </span>}
+                                                </td>
+                                                <td>
+                                                    {p.next_event_name
+                                                        ? <RemainingDays days={p.remaining_days} />
+                                                        : <span style={{ color: '#9ca3af' }}>—</span>}
                                                 </td>
                                                 <td>
                                                     {p.is_locked

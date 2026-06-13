@@ -49,6 +49,23 @@ const OVERDUE_LATERAL = `
     ) ov ON TRUE
 `;
 
+/* ── 次イベント LATERAL JOIN ── */
+const NEXT_EVENT_LATERAL = `
+    LEFT JOIN LATERAL (
+        SELECT
+            event_name,
+            plan_date,
+            (plan_date - CURRENT_DATE) AS remaining_days
+        FROM project_events
+        WHERE project_id = p.id
+          AND actual_date IS NULL
+          AND deleted_at IS NULL
+          AND plan_date IS NOT NULL
+        ORDER BY plan_date ASC
+        LIMIT 1
+    ) ne ON TRUE
+`;
+
 /* ── 健全性算出 SQL ── */
 const HEALTH_STATUS_SQL = `
     CASE
@@ -104,13 +121,17 @@ router.get('/', async (req, res, next) => {
                     ${HEALTH_STATUS_SQL}    AS health_status,
                     CASE WHEN pl.lock_status = 'active' AND pl.expires_at > NOW()
                          THEN TRUE ELSE FALSE END AS is_locked,
-                    pl.locked_by AS current_locked_by
+                    pl.locked_by AS current_locked_by,
+                    ne.event_name    AS next_event_name,
+                    TO_CHAR(ne.plan_date, 'YYYY-MM-DD') AS next_event_date,
+                    ne.remaining_days
              FROM projects p
              LEFT JOIN project_locks pl
                ON pl.project_id = p.id AND pl.lock_status = 'active' AND pl.expires_at > NOW()
              ${EVENT_COUNTS_LATERAL}
              ${ALARM_STATS_LATERAL}
              ${OVERDUE_LATERAL}
+             ${NEXT_EVENT_LATERAL}
              ${whereClause}
              ORDER BY p.updated_at DESC
              LIMIT $${params.length - 1} OFFSET $${params.length}`,

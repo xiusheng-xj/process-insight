@@ -48,7 +48,7 @@ router.post('/', async (req, res, next) => {
 
         // ── 2. パターン存在確認 ───────────────────────────
         const { rows: patternRows } = await client.query(
-            'SELECT id FROM milestone_pattern WHERE id = $1 AND is_active = TRUE',
+            'SELECT id FROM milestone_pattern WHERE id = $1 AND is_active = TRUE AND deleted_at IS NULL',
             [pattern_id]
         );
         if (!patternRows[0]) {

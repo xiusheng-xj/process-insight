@@ -41,7 +41,21 @@ export default function SaveAsPatternModal({ projectId, localEvents, onClose, on
             });
             onSaved(result.pattern);
         } catch (err) {
-            setError(err.response?.data?.error || '保存に失敗しました。');
+            let message =
+                err?.data?.message ||
+                err?.message       ||
+                err?.data?.error   ||
+                '保存に失敗しました。';
+
+            if (err?.error === 'DUPLICATE_PATTERN') {
+                message = '同じコードまたは名前のマイルストーンパターンが既に存在します。別の名前またはコードで保存してください。';
+            } else if (err?.error === 'DUPLICATE_PATTERN_STRUCTURE') {
+                message = err.existing_pattern
+                    ? `同じイベント構成のマイルストーンパターンが既に存在します。既存パターン：${err.existing_pattern}`
+                    : '同じイベント構成のマイルストーンパターンが既に存在します。既存パターンをご利用ください。';
+            }
+
+            setError(message);
         } finally {
             setSaving(false);
         }

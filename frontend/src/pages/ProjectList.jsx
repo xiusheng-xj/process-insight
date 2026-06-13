@@ -11,7 +11,19 @@ const EFFECTIVE_STATUS_MAP = {
     cancelled:   { label: '中止',   cls: 'badge-cancelled' },
 };
 
+const HEALTH_STATUS_MAP = {
+    healthy: { label: '計画通り', cls: 'badge-active'    },
+    caution: { label: '注意',     cls: 'badge-on_hold'   },
+    danger:  { label: '遅延',     cls: 'badge-cancelled' },
+};
+
 const MANUAL_STATUSES = new Set(['on_hold', 'cancelled']);
+
+const fmtDate = (dt) => {
+    if (!dt) return '—';
+    const d = new Date(dt);
+    return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+};
 
 export default function ProjectList() {
     const navigate = useNavigate();
@@ -37,8 +49,6 @@ export default function ProjectList() {
         await create(body);
         setShowCreate(false);
     }, [create]);
-
-    const si = (p) => EFFECTIVE_STATUS_MAP[p.effective_status] || { label: p.effective_status, cls: 'badge-pending' };
 
     return (
         <div className="page">
@@ -78,23 +88,27 @@ export default function ProjectList() {
                                 <tr>
                                     <th>案件No</th>
                                     <th>案件名</th>
-                                    <th>機種</th>
                                     <th>状態</th>
-                                    <th style={{ textAlign: 'center' }}>遅延</th>
+                                    <th>健全性</th>
+                                    <th style={{ textAlign: 'center' }}>アラーム</th>
+                                    <th>最終更新日</th>
                                     <th>ロック状態</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {data.length === 0 ? (
                                     <tr>
-                                        <td colSpan={6}>
+                                        <td colSpan={7}>
                                             <div className="empty-state">案件がありません</div>
                                         </td>
                                     </tr>
                                 ) : (
                                     data.map((p) => {
-                                        const { label, cls } = si(p);
+                                        const st = EFFECTIVE_STATUS_MAP[p.effective_status] || { label: p.effective_status, cls: 'badge-pending' };
+                                        const hl = HEALTH_STATUS_MAP[p.health_status]       || { label: '—', cls: '' };
                                         const showProgress = !MANUAL_STATUSES.has(p.effective_status);
+                                        const alarmCount   = Number(p.alarm_count) || 0;
+
                                         return (
                                             <tr key={p.id} onClick={() => navigate(`/projects/${p.id}`)}>
                                                 <td>
@@ -103,10 +117,9 @@ export default function ProjectList() {
                                                     </span>
                                                 </td>
                                                 <td style={{ fontWeight: 500 }}>{p.project_name}</td>
-                                                <td style={{ color: '#6b7280' }}>{p.machine_type || '—'}</td>
                                                 <td>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                        <span className={`badge ${cls}`}>{label}</span>
+                                                        <span className={`badge ${st.cls}`}>{st.label}</span>
                                                         {showProgress && (
                                                             <span style={{ fontSize: 11, color: '#9ca3af', whiteSpace: 'nowrap' }}>
                                                                 {p.progress_done}/{p.progress_total}
@@ -114,10 +127,18 @@ export default function ProjectList() {
                                                         )}
                                                     </div>
                                                 </td>
+                                                <td>
+                                                    {hl.cls
+                                                        ? <span className={`badge ${hl.cls}`}>{hl.label}</span>
+                                                        : <span style={{ color: '#9ca3af' }}>—</span>}
+                                                </td>
                                                 <td style={{ textAlign: 'center' }}>
-                                                    {Number(p.delay_count) > 0
-                                                        ? <span className="count-badge">{p.delay_count}</span>
-                                                        : <span style={{ color: '#d1d5db' }}>—</span>}
+                                                    <span style={{ fontSize: 13, color: alarmCount > 0 ? '#374151' : '#d1d5db' }}>
+                                                        {alarmCount}件
+                                                    </span>
+                                                </td>
+                                                <td style={{ fontSize: 13, color: '#6b7280' }}>
+                                                    {fmtDate(p.updated_at)}
                                                 </td>
                                                 <td>
                                                     {p.is_locked

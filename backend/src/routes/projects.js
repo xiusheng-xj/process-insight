@@ -27,6 +27,37 @@ const EVENT_COUNTS_LATERAL = `
     ) ec ON TRUE
 `;
 
+/* ── アラーム統計 LATERAL JOIN ── */
+const ALARM_STATS_LATERAL = `
+    LEFT JOIN LATERAL (
+        SELECT
+            COUNT(*)                                       AS alarm_count,
+            COUNT(*) FILTER (WHERE severity = 'critical') AS critical_count
+        FROM project_alerts
+        WHERE project_id = p.id AND is_resolved = FALSE
+    ) al ON TRUE
+`;
+
+/* ── 未完了遅れ件数 LATERAL JOIN ── */
+const OVERDUE_LATERAL = `
+    LEFT JOIN LATERAL (
+        SELECT COUNT(*) AS overdue_count
+        FROM project_events
+        WHERE project_id = p.id
+          AND actual_date IS NULL
+          AND plan_date < CURRENT_DATE
+    ) ov ON TRUE
+`;
+
+/* ── 健全性算出 SQL ── */
+const HEALTH_STATUS_SQL = `
+    CASE
+        WHEN ov.overdue_count >= 3 OR al.critical_count > 0 THEN 'danger'
+        WHEN ov.overdue_count >= 1 OR al.alarm_count    >= 1 THEN 'caution'
+        ELSE 'healthy'
+    END
+`;
+
 /* ── スケジュール評価 LATERAL JOIN（単件取得のみ） ── */
 const SCHEDULE_EVAL_LATERAL = `
     LEFT JOIN LATERAL (
@@ -66,15 +97,11 @@ router.get('/', async (req, res, next) => {
         const { rows } = await db.query(
             `SELECT p.*,
                     COUNT(*) OVER() AS total_count,
-                    (SELECT COUNT(*) FROM project_alerts a
-                     WHERE a.project_id = p.id AND a.is_resolved = FALSE) AS unresolved_alerts,
-                    (SELECT COUNT(*) FROM project_events e2
-                     WHERE e2.project_id = p.id
-                       AND e2.actual_date IS NULL
-                       AND e2.plan_date < NOW()::DATE) AS delay_count,
-                    ec.total AS progress_total,
-                    ec.done  AS progress_done,
+                    ec.total  AS progress_total,
+                    ec.done   AS progress_done,
+                    al.alarm_count,
                     ${EFFECTIVE_STATUS_SQL} AS effective_status,
+                    ${HEALTH_STATUS_SQL}    AS health_status,
                     CASE WHEN pl.lock_status = 'active' AND pl.expires_at > NOW()
                          THEN TRUE ELSE FALSE END AS is_locked,
                     pl.locked_by AS current_locked_by
@@ -82,6 +109,8 @@ router.get('/', async (req, res, next) => {
              LEFT JOIN project_locks pl
                ON pl.project_id = p.id AND pl.lock_status = 'active' AND pl.expires_at > NOW()
              ${EVENT_COUNTS_LATERAL}
+             ${ALARM_STATS_LATERAL}
+             ${OVERDUE_LATERAL}
              ${whereClause}
              ORDER BY p.updated_at DESC
              LIMIT $${params.length - 1} OFFSET $${params.length}`,

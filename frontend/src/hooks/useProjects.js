@@ -2,10 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { fetchProjects, fetchProject, createProject, updateProject, deleteProject } from '../api/projects';
 
 export function useProjects(params = {}) {
-    const [data, setData]       = useState([]);
-    const [total, setTotal]     = useState(0);
-    const [loading, setLoading] = useState(false);
-    const [error, setError]     = useState(null);
+    const [data, setData]             = useState([]);
+    const [total, setTotal]           = useState(0);
+    const [trashCount, setTrashCount] = useState(0);
+    const [loading, setLoading]       = useState(false);
+    const [error, setError]           = useState(null);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -14,6 +15,7 @@ export function useProjects(params = {}) {
             const res = await fetchProjects(params);
             setData(res.data);
             setTotal(res.total);
+            setTrashCount(res.trash_count ?? 0);
         } catch (err) {
             setError(err.message);
         } finally {
@@ -24,7 +26,7 @@ export function useProjects(params = {}) {
 
     useEffect(() => { load(); }, [load]);
 
-    return { data, total, loading, error, reload: load };
+    return { data, total, trashCount, loading, error, reload: load };
 }
 
 export function useProject(id) {
@@ -72,8 +74,11 @@ export function useProjectMutations(onSuccess) {
     return {
         loading,
         error,
-        create: (body)     => run(() => createProject(body)),
-        update: (id, body) => run(() => updateProject(id, body)),
-        remove: (id)       => run(() => deleteProject(id)),
+        create: (body)          => run(() => createProject(body)),
+        update: (id, body)      => run(() => updateProject(id, body)),
+        remove: (id, reason)    => run(() => deleteProject(id, {
+            reason,
+            deletedBy: sessionStorage.getItem('userName') || null,
+        })),
     };
 }

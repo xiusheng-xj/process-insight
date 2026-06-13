@@ -4,6 +4,7 @@ import ProjectList   from './pages/ProjectList';
 import ProjectDetail from './pages/ProjectDetail';
 import AlarmList     from './pages/AlarmList';
 import AlertSettings from './pages/AlertSettings';
+import TrashList     from './pages/TrashList';
 
 function NavBar() {
     return (
@@ -15,6 +16,12 @@ function NavBar() {
                     className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
                 >
                     案件一覧
+                </NavLink>
+                <NavLink
+                    to="/trash"
+                    className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+                >
+                    ゴミ箱
                 </NavLink>
                 <NavLink
                     to="/alerts"
@@ -83,6 +90,7 @@ export default function App() {
                     <Route path="/"                  element={<Navigate to="/projects" replace />} />
                     <Route path="/projects"          element={<ProjectList />} />
                     <Route path="/projects/:id"      element={<ProjectDetail />} />
+                    <Route path="/trash"              element={<TrashList />} />
                     <Route path="/alerts"            element={<AlarmList />} />
                     <Route path="/alerts/settings"   element={<AlertSettings />} />
                 </Routes>

@@ -78,7 +78,7 @@ router.get('/', async (req, res, next) => {
         const { status, search, page = 1, limit = 50 } = req.query;
         const offset = (page - 1) * limit;
         const params = [];
-        const where = [];
+        const where = ['p.deleted_at IS NULL'];
 
         if (status) {
             params.push(status);
@@ -118,10 +118,48 @@ router.get('/', async (req, res, next) => {
         );
 
         const total = rows[0]?.total_count ?? 0;
-        res.json({ data: rows, total: Number(total), page: Number(page), limit: Number(limit) });
+        const { rows: tc } = await db.query(
+            'SELECT COUNT(*) AS cnt FROM projects WHERE deleted_at IS NOT NULL'
+        );
+        res.json({
+            data: rows,
+            total: Number(total),
+            page: Number(page),
+            limit: Number(limit),
+            trash_count: Number(tc[0]?.cnt ?? 0),
+        });
     } catch (err) {
         next(err);
     }
+});
+
+// ゴミ箱一覧（/:id より前に定義）
+router.get('/trash', async (req, res, next) => {
+    try {
+        const { rows } = await db.query(
+            `SELECT id, project_no, project_name,
+                    deleted_at, deleted_reason, deleted_by, updated_at
+             FROM projects
+             WHERE deleted_at IS NOT NULL
+             ORDER BY deleted_at DESC`
+        );
+        res.json({ data: rows, total: rows.length });
+    } catch (err) { next(err); }
+});
+
+// 復元（/:id より前に定義）
+router.patch('/:id/restore', async (req, res, next) => {
+    try {
+        const { rows } = await db.query(
+            `UPDATE projects
+             SET deleted_at = NULL, deleted_reason = NULL
+             WHERE id = $1 AND deleted_at IS NOT NULL
+             RETURNING *`,
+            [req.params.id]
+        );
+        if (!rows[0]) return res.status(404).json({ error: '案件が見つかりません。' });
+        res.json(rows[0]);
+    } catch (err) { next(err); }
 });
 
 // 単件取得
@@ -281,15 +319,21 @@ router.put('/:id', async (req, res, next) => {
     }
 });
 
-// 削除
+// 論理削除（ゴミ箱へ移動）
 router.delete('/:id', async (req, res, next) => {
     try {
-        const { rowCount } = await db.query('DELETE FROM projects WHERE id = $1', [req.params.id]);
-        if (!rowCount) return res.status(404).json({ error: '案件が見つかりません。' });
-        res.status(204).send();
-    } catch (err) {
-        next(err);
-    }
+        const reason    = req.body?.reason    || null;
+        const deletedBy = req.headers['x-user-name'] || req.body?.deleted_by || null;
+        const { rows } = await db.query(
+            `UPDATE projects
+             SET deleted_at = NOW(), deleted_reason = $2, deleted_by = $3
+             WHERE id = $1 AND deleted_at IS NULL
+             RETURNING id`,
+            [req.params.id, reason, deletedBy]
+        );
+        if (!rows[0]) return res.status(404).json({ error: '案件が見つかりません。' });
+        res.json({ id: rows[0].id });
+    } catch (err) { next(err); }
 });
 
 module.exports = router;

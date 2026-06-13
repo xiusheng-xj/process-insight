@@ -44,11 +44,29 @@ export const updateProject = async (id, body) => {
 };
 
 /**
- * 案件削除
+ * 論理削除（ゴミ箱へ移動）
+ * @param {number} id
+ * @param {{ reason?: string, deletedBy?: string }} opts
+ */
+export const deleteProject = async (id, { reason = null, deletedBy = null } = {}) => {
+    await client.delete(`/projects/${id}`, { data: { reason, deleted_by: deletedBy } });
+};
+
+/**
+ * ゴミ箱一覧取得
+ */
+export const fetchTrash = async () => {
+    const res = await client.get('/projects/trash');
+    return res.data;
+};
+
+/**
+ * 復元
  * @param {number} id
  */
-export const deleteProject = async (id) => {
-    await client.delete(`/projects/${id}`);
+export const restoreProject = async (id) => {
+    const res = await client.patch(`/projects/${id}/restore`);
+    return res.data;
 };
 
 /**

@@ -1,15 +1,16 @@
 import { useState, useCallback, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useProject } from '../hooks/useProjects';
 import { useEvents, useEventMutations } from '../hooks/useEvents';
 import { useAlerts } from '../hooks/useAlerts';
 import { useLock } from '../hooks/useLock';
-import { fetchMilestonePatterns, applyMilestonePattern } from '../api/projects';
-import EventFormModal from '../components/EventFormModal';
-import ApplyPatternModal from '../components/ApplyPatternModal';
-import ProjectInfoCard from '../components/ProjectInfoCard';
-import AlertBanner from '../components/AlertBanner';
-import ScheduleSummary from '../components/ScheduleSummary';
+import { fetchMilestonePatterns, applyMilestonePattern, deleteProject } from '../api/projects';
+import EventFormModal      from '../components/EventFormModal';
+import ApplyPatternModal   from '../components/ApplyPatternModal';
+import ProjectInfoCard     from '../components/ProjectInfoCard';
+import AlertBanner         from '../components/AlertBanner';
+import ScheduleSummary     from '../components/ScheduleSummary';
+import DeleteProjectModal  from '../components/DeleteProjectModal';
 
 /* ── 定数 ── */
 const PROJECT_STATUS = {
@@ -45,8 +46,11 @@ function DiffCell({ diffDays, planDate, actualDate }) {
 /* ── メインコンポーネント ── */
 export default function ProjectDetail() {
     const { id } = useParams();
-    const [editMode, setEditMode] = useState(false);
+    const navigate = useNavigate();
+    const [editMode, setEditMode]     = useState(false);
     const [eventModal, setEventModal] = useState(null); // { mode:'create'|'edit', event? }
+    const [showDelete, setShowDelete] = useState(false);
+    const [deleting, setDeleting]     = useState(false);
 
     const { data: project, loading: pLoading, error: pError, reload: reloadProject } = useProject(id);
     const { data: events,  loading: eLoading, error: eError, reload: reloadEvents } = useEvents(id);
@@ -101,6 +105,23 @@ export default function ProjectDetail() {
         }
     }, [id, reloadProject, reloadEvents]);
 
+    /* ── 論理削除 ── */
+    const handleDelete = useCallback(async (reason) => {
+        setDeleting(true);
+        try {
+            await deleteProject(id, {
+                reason,
+                deletedBy: sessionStorage.getItem('userName') || null,
+            });
+            navigate('/projects');
+        } catch (err) {
+            alert(`削除に失敗しました: ${err.message}`);
+        } finally {
+            setDeleting(false);
+            setShowDelete(false);
+        }
+    }, [id, navigate]);
+
     /* ── イベント保存 ── */
     const handleEventSubmit = useCallback(async (body) => {
         if (eventModal?.mode === 'create') {
@@ -145,9 +166,19 @@ export default function ProjectDetail() {
                     <h1 className="page-title">{project.project_name}</h1>
                     <p className="page-sub">{project.project_no}</p>
                 </div>
-                <span className={`badge ${psi.cls}`} style={{ fontSize: 13, padding: '4px 14px' }}>
-                    {psi.label}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span className={`badge ${psi.cls}`} style={{ fontSize: 13, padding: '4px 14px' }}>
+                        {psi.label}
+                    </span>
+                    <button
+                        className="btn btn-ghost btn-sm"
+                        style={{ color: '#9ca3af' }}
+                        title="ゴミ箱へ移動"
+                        onClick={() => setShowDelete(true)}
+                    >
+                        🗑 削除
+                    </button>
+                </div>
             </div>
 
             {/* ── ロック状態バー ── */}
@@ -353,6 +384,14 @@ export default function ProjectDetail() {
                     onClose={() => setPatternModal(false)}
                     onSubmit={handlePatternApply}
                     loading={applyLoading}
+                />
+            )}
+            {showDelete && (
+                <DeleteProjectModal
+                    project={project}
+                    onClose={() => setShowDelete(false)}
+                    onConfirm={handleDelete}
+                    loading={deleting}
                 />
             )}
         </div>

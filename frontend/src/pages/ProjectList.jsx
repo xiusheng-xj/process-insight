@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useProjects, useProjectMutations } from '../hooks/useProjects';
-import CreateProjectModal from '../components/CreateProjectModal';
+import CreateProjectModal   from '../components/CreateProjectModal';
+import DeleteProjectModal   from '../components/DeleteProjectModal';
 
 const EFFECTIVE_STATUS_MAP = {
     not_started: { label: '未着手', cls: 'badge-pending'   },
@@ -30,9 +31,10 @@ export default function ProjectList() {
     const [searchInput, setSearchInput] = useState('');
     const [query, setQuery]             = useState({});
     const [showCreate, setShowCreate]   = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState(null); // project object
 
-    const { data, total, loading, error, reload } = useProjects(query);
-    const { create, loading: creating, error: createError } = useProjectMutations(reload);
+    const { data, total, trashCount, loading, error, reload } = useProjects(query);
+    const { create, remove, loading: mutating, error: mutError } = useProjectMutations(reload);
 
     const handleSearch = (e) => {
         e.preventDefault();
@@ -50,6 +52,11 @@ export default function ProjectList() {
         setShowCreate(false);
     }, [create]);
 
+    const handleDeleteConfirm = useCallback(async (reason) => {
+        await remove(deleteTarget.id, reason);
+        setDeleteTarget(null);
+    }, [remove, deleteTarget]);
+
     return (
         <div className="page">
             <div className="page-header">
@@ -57,9 +64,18 @@ export default function ProjectList() {
                     <h1 className="page-title">案件一覧</h1>
                     <p className="page-sub">全 {total} 件</p>
                 </div>
-                <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-                    ＋ 新規案件
-                </button>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <Link
+                        to="/trash"
+                        className="btn btn-secondary btn-sm"
+                        style={{ color: '#6b7280' }}
+                    >
+                        ゴミ箱{trashCount > 0 ? `（${trashCount}）` : ''}
+                    </Link>
+                    <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+                        ＋ 新規案件
+                    </button>
+                </div>
             </div>
 
             <div className="card">
@@ -78,6 +94,10 @@ export default function ProjectList() {
                     )}
                 </form>
 
+                {mutError && (
+                    <div className="error-state" style={{ margin: '0 16px 8px' }}>{mutError}</div>
+                )}
+
                 <div className="table-wrap">
                     {loading && <div className="loading-state">読み込み中…</div>}
                     {error   && <div className="error-state" style={{ margin: '0 16px 16px' }}>{error}</div>}
@@ -93,12 +113,13 @@ export default function ProjectList() {
                                     <th style={{ textAlign: 'center' }}>アラーム</th>
                                     <th>最終更新日</th>
                                     <th>ロック状態</th>
+                                    <th style={{ width: 56 }}></th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {data.length === 0 ? (
                                     <tr>
-                                        <td colSpan={7}>
+                                        <td colSpan={8}>
                                             <div className="empty-state">案件がありません</div>
                                         </td>
                                     </tr>
@@ -147,6 +168,17 @@ export default function ProjectList() {
                                                           </span>
                                                         : <span style={{ color: '#d1d5db', fontSize: 12 }}>—</span>}
                                                 </td>
+                                                <td onClick={e => e.stopPropagation()}>
+                                                    <button
+                                                        className="btn btn-ghost btn-xs"
+                                                        style={{ color: '#9ca3af' }}
+                                                        title="ゴミ箱へ移動"
+                                                        disabled={mutating}
+                                                        onClick={() => setDeleteTarget(p)}
+                                                    >
+                                                        🗑
+                                                    </button>
+                                                </td>
                                             </tr>
                                         );
                                     })
@@ -165,8 +197,16 @@ export default function ProjectList() {
                 <CreateProjectModal
                     onClose={() => setShowCreate(false)}
                     onSubmit={handleCreate}
-                    loading={creating}
-                    serverError={createError}
+                    loading={mutating}
+                    serverError={mutError}
+                />
+            )}
+            {deleteTarget && (
+                <DeleteProjectModal
+                    project={deleteTarget}
+                    onClose={() => setDeleteTarget(null)}
+                    onConfirm={handleDeleteConfirm}
+                    loading={mutating}
                 />
             )}
         </div>

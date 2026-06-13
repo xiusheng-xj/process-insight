@@ -168,16 +168,9 @@ export default function ProjectDetail() {
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
     );
 
-    /* ── ドラッグ完了: 楽観更新 → API 保存 ── */
-    const handleDragEnd = useCallback(async ({ active, over }) => {
-        if (!over || active.id === over.id) return;
-        const oldIdx = localEvents.findIndex(e => e.id === active.id);
-        const newIdx = localEvents.findIndex(e => e.id === over.id);
-        if (oldIdx === -1 || newIdx === -1) return;
-
-        const newOrder = arrayMove(localEvents, oldIdx, newIdx);
+    /* ── 並び替え保存（一覧タブ・ガントタブ共通） ── */
+    const saveReorder = useCallback(async (newOrder) => {
         setLocalEvents(newOrder);
-
         const payload = newOrder.map((e, i) => ({ id: e.id, sort_order: (i + 1) * 10 }));
         try {
             await reorderEvents(id, payload);
@@ -186,7 +179,16 @@ export default function ProjectDetail() {
             setLocalEvents(events); // 失敗時はロールバック
             alert('並び替えの保存に失敗しました。');
         }
-    }, [localEvents, events, id, reloadEvents]);
+    }, [events, id, reloadEvents]);
+
+    /* ── 一覧タブ DnD 完了 ── */
+    const handleDragEnd = useCallback(async ({ active, over }) => {
+        if (!over || active.id === over.id) return;
+        const oldIdx = localEvents.findIndex(e => e.id === active.id);
+        const newIdx = localEvents.findIndex(e => e.id === over.id);
+        if (oldIdx === -1 || newIdx === -1) return;
+        await saveReorder(arrayMove(localEvents, oldIdx, newIdx));
+    }, [localEvents, saveReorder]);
 
     useEffect(() => {
         fetchMilestonePatterns().then(setPatterns).catch(() => {});
@@ -450,7 +452,11 @@ export default function ProjectDetail() {
 
                 {/* ── ガントチャートタブ ── */}
                 {!eLoading && !eError && eventTab === 'gantt' && (
-                    <GanttChart events={localEvents} />
+                    <GanttChart
+                        events={localEvents}
+                        editMode={editMode}
+                        onReorder={saveReorder}
+                    />
                 )}
 
                 {/* ── イベント一覧タブ（DnD ソータブル） ── */}

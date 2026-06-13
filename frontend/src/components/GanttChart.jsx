@@ -1,11 +1,20 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
+import {
+    DndContext, closestCenter,
+    PointerSensor, useSensor, useSensors,
+} from '@dnd-kit/core';
+import {
+    SortableContext, verticalListSortingStrategy,
+    useSortable, arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
+/* ── 定数 ── */
 const SCALE_CFG = {
     month: { dayW: 8,  hdrH: 30, label: '月' },
     week:  { dayW: 18, hdrH: 46, label: '週' },
     day:   { dayW: 42, hdrH: 46, label: '日' },
 };
-
 const ROW_H  = 40;
 const LEFT_W = 440;
 const MRK    = 10;
@@ -17,6 +26,7 @@ const STATUS_LABEL = {
     delayed:     '遅延',
 };
 
+/* ── ヘルパー ── */
 const markerColor = (ev, today) => {
     if (!ev.actual_date) {
         if (ev.plan_date && new Date(ev.plan_date) < today) return '#dc2626';
@@ -43,6 +53,7 @@ const getMonday = (date) => {
     return d;
 };
 
+/* ── ヘッダー生成関数 ── */
 const generateMonths = (startDate, totalDays, dayW) => {
     const totalWidth = totalDays * dayW;
     const result = [];
@@ -93,31 +104,135 @@ const generateDays = (startDate, totalDays, dayW) => {
         result.push({
             label: String(d.getDate()),
             left: i * dayW, width: dayW,
-            isWeekend:    dow === 0 || dow === 6,
+            isWeekend: dow === 0 || dow === 6,
             isMonthStart: d.getDate() === 1,
         });
     }
     return result;
 };
 
-export default function GanttChart({ events }) {
+/* ── ソータブル左パネル行 ── */
+function SortableGanttLeftRow({ ev, today, editMode }) {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+        useSortable({ id: ev.id, disabled: !editMode });
+
+    const color = markerColor(ev, today);
+    const diff  = Number(ev.diff_days ?? null);
+    const diffLabel = (() => {
+        if (ev.actual_date == null && ev.plan_date) {
+            const od = Math.floor(
+                (today.getTime() - toDay0(new Date(ev.plan_date)).getTime()) / 86400000
+            );
+            if (od > 0) return { text: `+${od}日`, color: '#ea580c' };
+            return { text: '—', color: '#9ca3af' };
+        }
+        if (ev.diff_days == null) return { text: '—', color: '#9ca3af' };
+        if (diff < 0) return { text: `${diff}日`, color: '#059669' };
+        if (diff === 0) return { text: '±0', color: '#9ca3af' };
+        return { text: `+${diff}日`, color: '#ea580c' };
+    })();
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={{
+                display: 'flex', height: ROW_H, alignItems: 'center',
+                borderBottom: '1px solid #f3f4f6',
+                transform: CSS.Transform.toString(transform),
+                transition,
+                ...(isDragging
+                    ? { background: '#eff6ff', opacity: 0.85, position: 'relative', zIndex: 10 }
+                    : {}),
+            }}
+            {...attributes}
+        >
+            {editMode && (
+                <div
+                    {...listeners}
+                    title="ドラッグして並び替え"
+                    style={{
+                        width: 28, flexShrink: 0, textAlign: 'center',
+                        cursor: 'grab', userSelect: 'none',
+                        color: '#9ca3af', fontSize: 17, lineHeight: 1,
+                    }}
+                >
+                    ≡
+                </div>
+            )}
+            <div style={{
+                flex: 1, padding: '0 10px', fontWeight: 500,
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>
+                {ev.event_name}
+                {ev.is_custom && (
+                    <span style={{
+                        marginLeft: 4, fontSize: 9, color: '#6366f1',
+                        background: '#eef2ff', borderRadius: 3, padding: '1px 4px',
+                    }}>固有</span>
+                )}
+            </div>
+            <div style={{ width: 64, textAlign: 'center', color: '#374151' }}>
+                {fmtShort(ev.plan_date)}
+            </div>
+            <div style={{ width: 64, textAlign: 'center', color: ev.actual_date ? color : '#9ca3af' }}>
+                {fmtShort(ev.actual_date)}
+            </div>
+            <div style={{ width: 52, textAlign: 'center', fontSize: 11, color: diffLabel.color }}>
+                {diffLabel.text}
+            </div>
+            <div style={{ width: 56, textAlign: 'center' }}>
+                <span style={{
+                    fontSize: 10, padding: '1px 5px', borderRadius: 9999,
+                    background: `${color}22`, color,
+                }}>
+                    {STATUS_LABEL[ev.status] || ev.status}
+                </span>
+            </div>
+        </div>
+    );
+}
+
+/* ── メインコンポーネント ── */
+/**
+ * @param {{ events: object[], editMode?: boolean, onReorder?: (newOrder: object[]) => void }} props
+ */
+export default function GanttChart({ events, editMode = false, onReorder }) {
     const [scale, setScale] = useState('month');
     const { dayW, hdrH } = SCALE_CFG[scale];
     const today = useMemo(() => toDay0(new Date()), []);
 
-    const sorted = useMemo(
-        () => [...events].sort((a, b) =>
-            (Number(a.sort_order) - Number(b.sort_order)) || (a.id - b.id)
-        ),
-        [events]
+    /* ── ローカルソート状態（親から受け取った順序を保持） ── */
+    const [localSorted, setLocalSorted] = useState([]);
+    useEffect(() => {
+        // 親が渡す events はすでに sort_order 順。そのままの順序を使用。
+        setLocalSorted([...events]);
+    }, [events]);
+
+    /* ── DnD センサー ── */
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
     );
 
+    /* ── ドラッグ完了 ── */
+    const handleGanttDragEnd = useCallback(({ active, over }) => {
+        if (!over || active.id === over.id) return;
+        const oldIdx = localSorted.findIndex(e => e.id === active.id);
+        const newIdx = localSorted.findIndex(e => e.id === over.id);
+        if (oldIdx === -1 || newIdx === -1) return;
+        const newOrder = arrayMove(localSorted, oldIdx, newIdx);
+        setLocalSorted(newOrder); // 楽観更新（右パネルも即時追従）
+        onReorder?.(newOrder);    // 親: DB 保存 → 失敗時は events prop が戻り同期
+    }, [localSorted, onReorder]);
+
+    /* ── 日付レンジ ── */
     const { startDate, totalDays } = useMemo(() => {
         const pts = [today];
-        sorted.forEach(e => {
+        localSorted.forEach(e => {
             if (e.plan_date)   pts.push(toDay0(new Date(e.plan_date)));
             if (e.actual_date) pts.push(toDay0(new Date(e.actual_date)));
         });
+        if (pts.length === 1) pts.push(today); // 全イベント日付なし
+
         const minMs = Math.min(...pts.map(d => d.getTime()));
         const maxMs = Math.max(...pts.map(d => d.getTime()));
 
@@ -135,8 +250,9 @@ export default function GanttChart({ events }) {
         start.setHours(0, 0, 0, 0);
         end.setHours(0, 0, 0, 0);
         return { startDate: start, totalDays: Math.ceil((end.getTime() - start.getTime()) / 86400000) + 1 };
-    }, [sorted, today, scale]);
+    }, [localSorted, today, scale]);
 
+    /* ── 座標計算 ── */
     const cx = (dateStr) => {
         if (!dateStr) return null;
         const d = toDay0(new Date(dateStr));
@@ -145,22 +261,22 @@ export default function GanttChart({ events }) {
 
     const totalWidth = totalDays * dayW;
     const todayX     = Math.floor((today.getTime() - startDate.getTime()) / 86400000) * dayW + dayW / 2;
+    const halfH      = Math.floor(hdrH / 2);
 
+    /* ── ヘッダーデータ ── */
     const months     = useMemo(() => generateMonths(startDate, totalDays, dayW), [startDate, totalDays, dayW]);
     const weeks      = useMemo(() => scale === 'week' ? generateWeeks(startDate, totalDays, dayW) : [], [scale, startDate, totalDays, dayW]);
     const dayHeaders = useMemo(() => scale === 'day'  ? generateDays(startDate, totalDays, dayW)  : [], [scale, startDate, totalDays, dayW]);
 
-    const halfH = Math.floor(hdrH / 2);
+    const planOnlyEvents = localSorted.filter(e => !e.plan_date);
 
-    if (sorted.length === 0) {
+    if (localSorted.length === 0) {
         return <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>イベントがありません</div>;
     }
 
-    const planOnlyEvents = sorted.filter(e => !e.plan_date);
-
     return (
         <div>
-            {/* スケール切替ボタン */}
+            {/* スケール切替 */}
             <div style={{ display: 'flex', gap: 4, marginBottom: 10, justifyContent: 'flex-end' }}>
                 {Object.entries(SCALE_CFG).map(([key, cfg]) => (
                     <button
@@ -176,9 +292,15 @@ export default function GanttChart({ events }) {
             {/* ガント本体 */}
             <div style={{ display: 'flex', border: '1px solid #e5e7eb', borderRadius: 6, overflow: 'hidden', fontSize: 12 }}>
 
-                {/* 左パネル（固定） */}
+                {/* 左パネル（固定幅） */}
                 <div style={{ width: LEFT_W, flexShrink: 0, borderRight: '2px solid #e5e7eb', overflow: 'hidden' }}>
-                    <div style={{ display: 'flex', height: hdrH, background: '#f9fafb', borderBottom: '1px solid #e5e7eb', alignItems: 'flex-end', paddingBottom: 5 }}>
+
+                    {/* 左ヘッダー */}
+                    <div style={{
+                        display: 'flex', height: hdrH, background: '#f9fafb',
+                        borderBottom: '1px solid #e5e7eb', alignItems: 'flex-end', paddingBottom: 5,
+                    }}>
+                        {editMode && <div style={{ width: 28, flexShrink: 0 }} />}
                         <div style={{ flex: 1, padding: '0 10px', fontSize: 11, fontWeight: 600, color: '#6b7280' }}>イベント名</div>
                         <div style={{ width: 64, fontSize: 11, fontWeight: 600, color: '#6b7280', textAlign: 'center' }}>予定日</div>
                         <div style={{ width: 64, fontSize: 11, fontWeight: 600, color: '#6b7280', textAlign: 'center' }}>実績日</div>
@@ -186,49 +308,34 @@ export default function GanttChart({ events }) {
                         <div style={{ width: 56, fontSize: 11, fontWeight: 600, color: '#6b7280', textAlign: 'center' }}>状態</div>
                     </div>
 
-                    {sorted.map((ev) => {
-                        const color = markerColor(ev, today);
-                        const diff  = Number(ev.diff_days ?? null);
-                        const diffLabel = (() => {
-                            if (ev.actual_date == null && ev.plan_date) {
-                                const od = Math.floor((today.getTime() - toDay0(new Date(ev.plan_date)).getTime()) / 86400000);
-                                if (od > 0) return { text: `+${od}日`, color: '#ea580c' };
-                                return { text: '—', color: '#9ca3af' };
-                            }
-                            if (ev.diff_days == null) return { text: '—', color: '#9ca3af' };
-                            if (diff < 0) return { text: `${diff}日`, color: '#059669' };
-                            if (diff === 0) return { text: '±0', color: '#9ca3af' };
-                            return { text: `+${diff}日`, color: '#ea580c' };
-                        })();
-
-                        return (
-                            <div key={ev.id} style={{ display: 'flex', height: ROW_H, alignItems: 'center', borderBottom: '1px solid #f3f4f6' }}>
-                                <div style={{ flex: 1, padding: '0 10px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    {ev.event_name}
-                                    {ev.is_custom && (
-                                        <span style={{ marginLeft: 4, fontSize: 9, color: '#6366f1', background: '#eef2ff', borderRadius: 3, padding: '1px 4px' }}>固有</span>
-                                    )}
-                                </div>
-                                <div style={{ width: 64, textAlign: 'center', color: '#374151' }}>{fmtShort(ev.plan_date)}</div>
-                                <div style={{ width: 64, textAlign: 'center', color: ev.actual_date ? color : '#9ca3af' }}>{fmtShort(ev.actual_date)}</div>
-                                <div style={{ width: 52, textAlign: 'center', fontSize: 11, color: diffLabel.color }}>{diffLabel.text}</div>
-                                <div style={{ width: 56, textAlign: 'center' }}>
-                                    <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 9999, background: `${color}22`, color }}>
-                                        {STATUS_LABEL[ev.status] || ev.status}
-                                    </span>
-                                </div>
-                            </div>
-                        );
-                    })}
+                    {/* 左パネル行（DnD ソータブル） */}
+                    <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleGanttDragEnd}
+                    >
+                        <SortableContext
+                            items={localSorted.map(e => e.id)}
+                            strategy={verticalListSortingStrategy}
+                        >
+                            {localSorted.map(ev => (
+                                <SortableGanttLeftRow
+                                    key={ev.id}
+                                    ev={ev}
+                                    today={today}
+                                    editMode={editMode}
+                                />
+                            ))}
+                        </SortableContext>
+                    </DndContext>
                 </div>
 
                 {/* 右パネル（横スクロール） */}
                 <div style={{ flex: 1, overflowX: 'auto' }}>
                     <div style={{ width: totalWidth, position: 'relative' }}>
 
-                        {/* ヘッダー */}
+                        {/* 右ヘッダー */}
                         <div style={{ height: hdrH, position: 'relative', background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                            {/* 月ラベル（月モードは全高、週/日モードは上半分） */}
                             {months.map((m, i) => (
                                 <div key={i} style={{
                                     position: 'absolute', left: m.left, width: m.width,
@@ -242,8 +349,6 @@ export default function GanttChart({ events }) {
                                     {m.label}
                                 </div>
                             ))}
-
-                            {/* 週ラベル（下半分） */}
                             {scale === 'week' && weeks.map((w, i) => (
                                 <div key={i} style={{
                                     position: 'absolute', left: w.left, width: w.width,
@@ -256,8 +361,6 @@ export default function GanttChart({ events }) {
                                     {w.label}
                                 </div>
                             ))}
-
-                            {/* 日ラベル（下半分） */}
                             {scale === 'day' && dayHeaders.map((d, i) => (
                                 <div key={i} style={{
                                     position: 'absolute', left: d.left, width: d.width,
@@ -283,19 +386,17 @@ export default function GanttChart({ events }) {
                             }} />
                         )}
 
-                        {/* イベント行 */}
-                        {sorted.map((ev) => {
+                        {/* ガントバー行（localSorted 順で右パネルも同期） */}
+                        {localSorted.map((ev) => {
                             const planX   = cx(ev.plan_date);
                             const actualX = cx(ev.actual_date);
                             const color   = markerColor(ev, today);
                             const cyPos   = ROW_H / 2;
-
                             let barL = null, barW = null;
                             if (planX !== null && actualX !== null) {
                                 barL = Math.min(planX, actualX);
                                 barW = Math.max(1, Math.abs(actualX - planX));
                             }
-
                             return (
                                 <div key={ev.id} style={{ height: ROW_H, position: 'relative', borderBottom: '1px solid #f3f4f6' }}>
                                     {barL !== null && (
@@ -356,6 +457,11 @@ export default function GanttChart({ events }) {
                     <span style={{ display: 'inline-block', width: 1, height: 14, background: '#dc2626', opacity: 0.55 }} />
                     今日
                 </span>
+                {editMode && (
+                    <span style={{ marginLeft: 8, color: '#6366f1', fontSize: 11 }}>
+                        ≡ ドラッグで並び替え可
+                    </span>
+                )}
             </div>
 
             {planOnlyEvents.length > 0 && (

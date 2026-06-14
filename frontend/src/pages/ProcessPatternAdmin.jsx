@@ -9,16 +9,16 @@ import {
 const DEPT_LABEL = { A: 'A部門', SELF: '自部門', B: 'B部門', C: 'C部門', D: 'D部門' };
 
 function StepList({ steps }) {
-    if (!steps || steps.length === 0) return <span style={{ color: '#9ca3af', fontSize: 12 }}>ステップなし</span>;
+    if (!steps || steps.length === 0) return <span style={{ color: 'var(--color-subtle)', fontSize: 12 }}>ステップなし</span>;
     return (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
             {steps.map((s, i) => (
                 <span key={i} style={{
-                    fontSize: 11, background: '#f3f4f6', borderRadius: 4,
-                    padding: '2px 7px', color: '#374151',
+                    fontSize: 11, background: 'var(--color-bg)', border: '1px solid var(--color-border)',
+                    borderRadius: 4, padding: '2px 7px', color: 'var(--color-text)',
                 }}>
                     {i + 1}. {s.process_name}
-                    {s.department_code && <span style={{ color: '#9ca3af' }}> ({DEPT_LABEL[s.department_code] || s.department_code})</span>}
+                    {s.department_code && <span style={{ color: 'var(--color-muted)' }}> ({DEPT_LABEL[s.department_code] || s.department_code})</span>}
                 </span>
             ))}
         </div>
@@ -78,7 +78,7 @@ function CreatePatternModal({ onClose, onCreated }) {
                 <div style={{ flex: 1, overflowY: 'auto', padding: '0 0 8px' }}>
                     <form id="create-proc-pattern" onSubmit={handleSubmit}>
                         <div className="form-group">
-                            <label className="form-label">パターン名 <span style={{ color: '#dc2626' }}>*</span></label>
+                            <label className="form-label">パターン名 <span style={{ color: 'var(--color-danger)' }}>*</span></label>
                             <input className="form-input" type="text" value={name} onChange={e => setName(e.target.value)}
                                 placeholder="例：標準製造工程" maxLength={255} autoFocus />
                         </div>
@@ -94,10 +94,10 @@ function CreatePatternModal({ onClose, onCreated }) {
 
                         {/* ステップリスト */}
                         <div style={{ marginBottom: 12 }}>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 8 }}>工程ステップ</div>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>工程ステップ</div>
                             {steps.map((s, i) => (
                                 <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
-                                    <span style={{ fontSize: 11, color: '#9ca3af', width: 20, textAlign: 'right' }}>{i + 1}</span>
+                                    <span style={{ fontSize: 11, color: 'var(--color-subtle)', width: 20, textAlign: 'right' }}>{i + 1}</span>
                                     <input
                                         className="form-input"
                                         type="text"
@@ -121,7 +121,7 @@ function CreatePatternModal({ onClose, onCreated }) {
                                         onChange={e => updateStep(i, 'offset_days', e.target.value)}
                                     />
                                     <button type="button" onClick={() => removeStep(i)}
-                                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: 16, padding: 0 }}
+                                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-subtle)', fontSize: 16, padding: 0 }}
                                         disabled={steps.length <= 1}>×</button>
                                 </div>
                             ))}
@@ -213,52 +213,59 @@ export default function ProcessPatternAdmin() {
 
                 {!loading && patterns.map(p => (
                     <div key={p.id} style={{
-                        borderBottom: '1px solid #f3f4f6',
-                        padding: '14px 20px',
-                        opacity: p.is_active ? 1 : 0.5,
+                        borderBottom: '1px solid var(--color-border-light)',
+                        padding: '16px 20px',
+                        opacity: p.is_active ? 1 : 0.55,
+                        background: p.is_active ? 'transparent' : '#fafbfc',
                     }}>
                         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                            <div style={{ flex: 1 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                                    <span style={{ fontWeight: 600, fontSize: 14 }}>{p.pattern_name}</span>
-                                    <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#6b7280', background: '#f3f4f6', borderRadius: 3, padding: '1px 5px' }}>
-                                        {p.pattern_code}
-                                    </span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5, flexWrap: 'wrap' }}>
+                                    <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--color-text)' }}>{p.pattern_name}</span>
+                                    {p.pattern_code && (
+                                        <span className="mono" style={{ fontSize: 10.5, color: 'var(--color-muted)', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 4, padding: '1px 6px' }}>
+                                            {p.pattern_code}
+                                        </span>
+                                    )}
                                     {!p.is_active && (
-                                        <span style={{ fontSize: 11, color: '#dc2626', background: '#fef2f2', borderRadius: 3, padding: '1px 5px' }}>無効</span>
+                                        <span className="badge badge-delayed" style={{ fontSize: 10 }}>無効</span>
+                                    )}
+                                    {p.steps?.length > 0 && (
+                                        <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>{p.steps.length} ステップ</span>
                                     )}
                                 </div>
                                 {p.description && (
-                                    <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>{p.description}</div>
+                                    <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 8 }}>{p.description}</div>
                                 )}
-                                <div style={{ marginBottom: 4 }}>
+                                <div style={{ marginBottom: 6 }}>
                                     <StepList steps={p.steps} />
                                 </div>
                                 {p.steps?.length > 0 && (
                                     <button
                                         onClick={() => toggleExpand(p.id)}
-                                        style={{ fontSize: 11, color: '#2563eb', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                                        style={{ fontSize: 11, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 2 }}
                                     >
-                                        {expanded.has(p.id) ? '▲ 折りたたむ' : `▼ 詳細（${p.steps.length} ステップ）`}
+                                        {expanded.has(p.id) ? '▲ 折りたたむ' : '▼ 詳細を展開'}
                                     </button>
                                 )}
                                 {expanded.has(p.id) && p.steps?.length > 0 && (
-                                    <div style={{ marginTop: 8, border: '1px solid #e5e7eb', borderRadius: 6, overflow: 'hidden' }}>
+                                    <div style={{ marginTop: 10, border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '32px 1fr 80px 80px', background: '#f8fafc', padding: '6px 12px', fontSize: 10.5, color: 'var(--color-subtle)', borderBottom: '1px solid var(--color-border)', fontWeight: 600, letterSpacing: '.04em', textTransform: 'uppercase' }}>
+                                            <span>#</span><span>工程名</span><span>部門</span><span>Offset</span>
+                                        </div>
                                         {p.steps.map((s, i) => (
                                             <div key={i} style={{
-                                                display: 'flex', gap: 10, alignItems: 'center',
-                                                padding: '6px 12px', fontSize: 12,
-                                                borderBottom: i < p.steps.length - 1 ? '1px solid #f9fafb' : undefined,
-                                                background: i % 2 === 0 ? '#ffffff' : '#fafafa',
+                                                display: 'grid', gridTemplateColumns: '32px 1fr 80px 80px',
+                                                padding: '7px 12px', fontSize: 12.5,
+                                                borderBottom: i < p.steps.length - 1 ? '1px solid var(--color-border-light)' : undefined,
+                                                background: i % 2 === 0 ? '#fff' : '#fafbfc',
                                             }}>
-                                                <span style={{ color: '#9ca3af', width: 20, textAlign: 'right' }}>{i + 1}</span>
-                                                <span style={{ flex: 1 }}>{s.process_name}</span>
-                                                {s.department_code && (
-                                                    <span style={{ fontSize: 10, color: '#6b7280' }}>
-                                                        {DEPT_LABEL[s.department_code] || s.department_code}
-                                                    </span>
-                                                )}
-                                                <span style={{ color: '#9ca3af', fontSize: 11 }}>
+                                                <span style={{ color: 'var(--color-subtle)' }}>{i + 1}</span>
+                                                <span style={{ fontWeight: 500, color: 'var(--color-text)' }}>{s.process_name}</span>
+                                                <span style={{ color: 'var(--color-muted)', fontSize: 11 }}>
+                                                    {s.department_code ? (DEPT_LABEL[s.department_code] || s.department_code) : '—'}
+                                                </span>
+                                                <span style={{ color: 'var(--color-muted)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
                                                     {s.offset_days >= 0 ? `+${s.offset_days}日` : `${s.offset_days}日`}
                                                 </span>
                                             </div>
@@ -267,19 +274,14 @@ export default function ProcessPatternAdmin() {
                                 )}
                             </div>
 
-                            <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
+                            <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
                                 <button
                                     className={`btn btn-sm ${p.is_active ? 'btn-secondary' : 'btn-primary'}`}
                                     onClick={() => handleToggleActive(p)}
-                                    style={{ fontSize: 12 }}
                                 >
                                     {p.is_active ? '無効化' : '有効化'}
                                 </button>
-                                <button
-                                    className="btn btn-ghost btn-sm"
-                                    onClick={() => handleDelete(p)}
-                                    style={{ color: '#dc2626', fontSize: 12 }}
-                                >
+                                <button className="btn btn-danger btn-sm" onClick={() => handleDelete(p)}>
                                     削除
                                 </button>
                             </div>

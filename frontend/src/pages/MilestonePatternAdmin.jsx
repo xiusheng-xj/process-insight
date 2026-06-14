@@ -323,86 +323,81 @@ export default function MilestonePatternAdmin() {
 
                 {!loading && visible.map(p => (
                     <div key={p.id} style={{
-                        borderBottom: '1px solid #f3f4f6',
-                        padding: '14px 20px',
-                        opacity: p.is_active ? 1 : 0.5,
+                        borderBottom: '1px solid var(--color-border-light)',
+                        padding: '16px 20px',
+                        opacity: p.is_active ? 1 : 0.55,
+                        background: p.is_active ? 'transparent' : '#fafbfc',
                     }}>
                         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                            <div style={{ flex: 1 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                                    <span style={{ fontWeight: 600, fontSize: 14 }}>{p.pattern_name}</span>
-                                    <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#6b7280', background: '#f3f4f6', borderRadius: 3, padding: '1px 5px' }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5, flexWrap: 'wrap' }}>
+                                    <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--color-text)' }}>{p.pattern_name}</span>
+                                    <span className="mono" style={{ fontSize: 10.5, color: 'var(--color-muted)', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 4, padding: '1px 6px' }}>
                                         {p.pattern_code}
                                     </span>
                                     {p.machine_type && (
-                                        <span style={{ fontSize: 11, color: '#6b7280', background: '#fef9c3', borderRadius: 3, padding: '1px 5px' }}>
+                                        <span style={{ fontSize: 11, color: '#92400e', background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 4, padding: '1px 6px' }}>
                                             {p.machine_type}
                                         </span>
                                     )}
                                     {!p.is_active && (
-                                        <span style={{ fontSize: 11, color: '#dc2626', background: '#fef2f2', borderRadius: 3, padding: '1px 5px' }}>無効</span>
+                                        <span className="badge badge-delayed" style={{ fontSize: 10 }}>無効</span>
+                                    )}
+                                    {p.events?.length > 0 && (
+                                        <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>{p.events.length} イベント</span>
                                     )}
                                 </div>
                                 {p.description && (
-                                    <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>{p.description}</div>
+                                    <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 8 }}>{p.description}</div>
                                 )}
-                                <div style={{ marginBottom: 4 }}>
+                                <div style={{ marginBottom: 6 }}>
                                     <EventList events={p.events} />
                                 </div>
                                 {p.events?.length > 0 && (
                                     <button
                                         onClick={() => toggleExpand(p.id)}
-                                        style={{ fontSize: 11, color: '#2563eb', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 4 }}
+                                        style={{ fontSize: 11, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 2 }}
                                     >
-                                        {expanded.has(p.id) ? '▲ 折りたたむ' : `▼ 詳細（${p.events.length} イベント）`}
+                                        {expanded.has(p.id) ? '▲ 折りたたむ' : `▼ 詳細を展開`}
                                     </button>
                                 )}
                                 {expanded.has(p.id) && p.events?.length > 0 && (
-                                    <div style={{ marginTop: 8, border: '1px solid #e5e7eb', borderRadius: 6, overflow: 'hidden' }}>
-                                        <div style={{ display: 'grid', gridTemplateColumns: '32px 1fr 80px 60px 140px 48px 48px', gap: 0, background: '#f9fafb', padding: '5px 12px', fontSize: 10, color: '#9ca3af', borderBottom: '1px solid #e5e7eb' }}>
-                                            <span>#</span><span>イベント名</span><span>部門</span><span>offset</span><span>基準</span><span>M</span><span>必須</span>
+                                    <div style={{ marginTop: 10, border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '32px 1fr 80px 60px 140px 48px 48px', background: '#f8fafc', padding: '6px 12px', fontSize: 10.5, color: 'var(--color-subtle)', borderBottom: '1px solid var(--color-border)', fontWeight: 600, letterSpacing: '.04em', textTransform: 'uppercase' }}>
+                                            <span>#</span><span>イベント名</span><span>部門</span><span>Offset</span><span>基準</span><span>M</span><span>必須</span>
                                         </div>
                                         {p.events.map((e, i) => (
                                             <div key={i} style={{
                                                 display: 'grid',
                                                 gridTemplateColumns: '32px 1fr 80px 60px 140px 48px 48px',
-                                                gap: 0, padding: '6px 12px', fontSize: 12,
-                                                borderBottom: i < p.events.length - 1 ? '1px solid #f9fafb' : undefined,
-                                                background: i % 2 === 0 ? '#ffffff' : '#fafafa',
+                                                padding: '7px 12px', fontSize: 12.5,
+                                                borderBottom: i < p.events.length - 1 ? '1px solid var(--color-border-light)' : undefined,
+                                                background: i % 2 === 0 ? '#fff' : '#fafbfc',
                                             }}>
-                                                <span style={{ color: '#9ca3af' }}>{i + 1}</span>
-                                                <span style={{ fontWeight: 500 }}>{e.event_name}</span>
-                                                <span style={{ color: '#6b7280' }}>{e.owner_department || '—'}</span>
-                                                <span style={{ color: '#6b7280' }}>{e.offset_days >= 0 ? `+${e.offset_days}` : e.offset_days}日</span>
-                                                <span style={{ color: '#6b7280', fontSize: 11 }}>{OFFSET_BASE_LABEL[e.offset_base] || e.offset_base}</span>
-                                                <span style={{ color: e.is_milestone ? '#2563eb' : '#d1d5db' }}>{e.is_milestone ? '●' : '○'}</span>
-                                                <span style={{ color: e.is_required ? '#059669' : '#d1d5db' }}>{e.is_required ? '●' : '○'}</span>
+                                                <span style={{ color: 'var(--color-subtle)' }}>{i + 1}</span>
+                                                <span style={{ fontWeight: 500, color: 'var(--color-text)' }}>{e.event_name}</span>
+                                                <span style={{ color: 'var(--color-muted)' }}>{e.owner_department || '—'}</span>
+                                                <span style={{ color: 'var(--color-muted)', fontFamily: 'var(--font-mono)' }}>{e.offset_days >= 0 ? `+${e.offset_days}` : e.offset_days}日</span>
+                                                <span style={{ color: 'var(--color-muted)', fontSize: 11 }}>{OFFSET_BASE_LABEL[e.offset_base] || e.offset_base}</span>
+                                                <span style={{ color: e.is_milestone ? 'var(--color-primary)' : 'var(--color-border)' }}>{e.is_milestone ? '●' : '○'}</span>
+                                                <span style={{ color: e.is_required ? 'var(--color-success)' : 'var(--color-border)' }}>{e.is_required ? '●' : '○'}</span>
                                             </div>
                                         ))}
                                     </div>
                                 )}
                             </div>
 
-                            <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
-                                <button
-                                    className="btn btn-secondary btn-sm"
-                                    onClick={() => setEditTarget(p)}
-                                    style={{ fontSize: 12 }}
-                                >
+                            <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
+                                <button className="btn btn-secondary btn-sm" onClick={() => setEditTarget(p)}>
                                     編集
                                 </button>
                                 <button
                                     className={`btn btn-sm ${p.is_active ? 'btn-secondary' : 'btn-primary'}`}
                                     onClick={() => handleToggleActive(p)}
-                                    style={{ fontSize: 12 }}
                                 >
                                     {p.is_active ? '無効化' : '有効化'}
                                 </button>
-                                <button
-                                    className="btn btn-ghost btn-sm"
-                                    onClick={() => setDeleteTarget(p)}
-                                    style={{ color: '#dc2626', fontSize: 12 }}
-                                >
+                                <button className="btn btn-danger btn-sm" onClick={() => setDeleteTarget(p)}>
                                     削除
                                 </button>
                             </div>

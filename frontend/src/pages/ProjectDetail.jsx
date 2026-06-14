@@ -67,19 +67,19 @@ function DiffCell({ diffDays, planDate, actualDate }) {
 
 /* ── 工程ステップ 差異表示 ── */
 function StepDiffCell({ diffDays, latestActualDate }) {
-    if (!latestActualDate) return <span style={{ color: '#9ca3af' }}>—</span>;
-    if (diffDays == null)  return <span style={{ color: '#9ca3af' }}>—</span>;
-    if (diffDays < 0)  return <span style={{ color: '#059669' }}>{diffDays}日（前倒し）</span>;
-    if (diffDays === 0) return <span style={{ color: '#6b7280' }}>0日（計画通り）</span>;
-    return <span style={{ color: '#dc2626' }}>+{diffDays}日（遅延）</span>;
+    if (!latestActualDate) return <span style={{ color: 'var(--color-subtle)' }}>—</span>;
+    if (diffDays == null)  return <span style={{ color: 'var(--color-subtle)' }}>—</span>;
+    if (diffDays < 0)  return <span className="diff diff-early">{diffDays}日（前倒し）</span>;
+    if (diffDays === 0) return <span className="diff diff-ontime">0日（計画通り）</span>;
+    return <span className="diff diff-late">+{diffDays}日（遅延）</span>;
 }
 
 /* ── 工程ステップ サブ行（マイルストーン行と列を揃える） ── */
 function ProcessStepSubRow({ step, editMode, onDelete, onEdit }) {
     const isDone = !!step.latest_actual_date;
     const cell = {
-        borderBottom: '1px solid #e0f2fe',
-        background: '#f0f9ff',
+        borderBottom: '1px solid #bfdbfe',
+        background: '#eff6ff',
         fontSize: 12,
         paddingTop: 5,
         paddingBottom: 5,
@@ -96,7 +96,7 @@ function ProcessStepSubRow({ step, editMode, onDelete, onEdit }) {
             {/* 工程名 */}
             <td style={{ ...cell, paddingLeft: editMode ? 10 : 28 }}>
                 {!editMode && <span style={{ color: '#93c5fd', marginRight: 4 }}>└</span>}
-                <span style={{ fontWeight: 500, color: isDone ? '#94a3b8' : '#374151' }}>
+                <span style={{ fontWeight: 500, color: isDone ? 'var(--color-subtle)' : 'var(--color-text)' }}>
                     {step.process_name}
                 </span>
                 {step.is_custom && (
@@ -106,7 +106,7 @@ function ProcessStepSubRow({ step, editMode, onDelete, onEdit }) {
                 )}
             </td>
             {/* 担当部門 */}
-            <td style={{ ...cell, color: '#6b7280' }}>
+            <td style={{ ...cell, color: 'var(--color-muted)' }}>
                 {DEPT_LABEL[step.department_code] || step.department_code || '—'}
             </td>
             {/* 予定日 */}
@@ -114,15 +114,15 @@ function ProcessStepSubRow({ step, editMode, onDelete, onEdit }) {
                 {step.plan_date ? step.plan_date.slice(0, 10) : '—'}
             </td>
             {/* 最新実績 */}
-            <td style={{ ...cell, color: isDone ? '#059669' : '#9ca3af' }}>
+            <td style={{ ...cell, color: isDone ? 'var(--color-success)' : 'var(--color-subtle)' }}>
                 {step.latest_actual_date ? step.latest_actual_date.slice(0, 10) : '未入力'}
             </td>
             {/* 前回実績 */}
-            <td style={{ ...cell, color: '#6b7280', fontSize: 11 }}>
+            <td style={{ ...cell, color: 'var(--color-muted)', fontSize: 11 }}>
                 {step.previous_actual_date ? step.previous_actual_date.slice(0, 10) : '—'}
             </td>
             {/* 前々回実績 */}
-            <td style={{ ...cell, color: '#9ca3af', fontSize: 11 }}>
+            <td style={{ ...cell, color: 'var(--color-subtle)', fontSize: 11 }}>
                 {step.pre_previous_actual_date ? step.pre_previous_actual_date.slice(0, 10) : '—'}
             </td>
             {/* 差異 */}
@@ -131,11 +131,7 @@ function ProcessStepSubRow({ step, editMode, onDelete, onEdit }) {
             </td>
             {/* 状態バッジ (latest_actual_date の有無で判定) */}
             <td style={cell}>
-                <span style={{
-                    fontSize: 10, borderRadius: 3, padding: '1px 6px',
-                    background: isDone ? '#d1fae5' : '#f3f4f6',
-                    color:      isDone ? '#059669' : '#6b7280',
-                }}>
+                <span className={`badge ${isDone ? 'badge-completed' : 'badge-pending'}`} style={{ fontSize: 10 }}>
                     {isDone ? '完了' : '未完了'}
                 </span>
             </td>
@@ -145,14 +141,14 @@ function ProcessStepSubRow({ step, editMode, onDelete, onEdit }) {
                     <div className="btn-group">
                         <button
                             className="btn btn-ghost btn-xs"
-                            style={{ fontSize: 11, color: '#6b7280' }}
+                            style={{ color: 'var(--color-muted)', fontSize: 11 }}
                             onClick={() => onEdit(step)}
                         >
                             編集
                         </button>
                         <button
-                            className="btn btn-ghost btn-xs"
-                            style={{ fontSize: 11, color: '#dc2626' }}
+                            className="btn btn-danger btn-xs"
+                            style={{ fontSize: 11 }}
                             onClick={() => onDelete(step)}
                         >
                             削除
@@ -176,9 +172,9 @@ function SortableRow({ ev, editMode, eMutating, onEdit, onDelete, stepCount, isS
         transform: CSS.Transform.toString(transform),
         transition,
         ...(isDragging
-            ? { background: '#eff6ff', opacity: 0.85, boxShadow: '0 4px 14px rgba(0,0,0,0.1)', position: 'relative', zIndex: 10 }
+            ? { background: 'var(--color-primary-bg)', opacity: 0.85, boxShadow: 'var(--shadow-md)', position: 'relative', zIndex: 10 }
             : hasSteps
-            ? { background: '#eff6ff', borderLeft: '3px solid #3b82f6' }
+            ? { background: 'var(--color-primary-bg)', borderLeft: '3px solid var(--color-primary)' }
             : isOverdue
             ? { background: '#fff9f9' }
             : {}),
@@ -191,7 +187,7 @@ function SortableRow({ ev, editMode, eMutating, onEdit, onDelete, stepCount, isS
                     <span
                         {...listeners}
                         title="ドラッグして並び替え"
-                        style={{ display: 'inline-block', cursor: 'grab', color: '#9ca3af', fontSize: 18, lineHeight: 1, padding: '4px 2px' }}
+                        style={{ display: 'inline-block', cursor: 'grab', color: 'var(--color-subtle)', fontSize: 18, lineHeight: 1, padding: '4px 2px' }}
                     >
                         ≡
                     </span>
@@ -220,17 +216,17 @@ function SortableRow({ ev, editMode, eMutating, onEdit, onDelete, stepCount, isS
                     </button>
                 </div>
             </td>
-            <td style={{ color: '#6b7280' }}>{ev.owner_department || '—'}</td>
+            <td style={{ color: 'var(--color-muted)' }}>{ev.owner_department || '—'}</td>
             <td>{ev.plan_date ? ev.plan_date.slice(0, 10) : '—'}</td>
             <td>
                 {ev.actual_date
                     ? ev.actual_date.slice(0, 10)
-                    : <span style={{ color: '#9ca3af' }}>未入力</span>}
+                    : <span style={{ color: 'var(--color-subtle)' }}>未入力</span>}
             </td>
-            <td style={{ color: '#6b7280', fontSize: 12 }}>
+            <td style={{ color: 'var(--color-muted)', fontSize: 12 }}>
                 {ev.actual_date_prev1 ? ev.actual_date_prev1.slice(0, 10) : '—'}
             </td>
-            <td style={{ color: '#9ca3af', fontSize: 12 }}>
+            <td style={{ color: 'var(--color-subtle)', fontSize: 12 }}>
                 {ev.actual_date_prev2 ? ev.actual_date_prev2.slice(0, 10) : '—'}
             </td>
             <td>
@@ -249,7 +245,7 @@ function SortableRow({ ev, editMode, eMutating, onEdit, onDelete, stepCount, isS
                         </button>
                         <button
                             className="btn btn-ghost btn-xs"
-                            style={{ color: '#6366f1' }}
+                            style={{ color: '#6366f1', fontSize: 11 }}
                             onClick={onManageSteps}
                             disabled={eMutating}
                             title="工程パターンを適用"
@@ -257,8 +253,8 @@ function SortableRow({ ev, editMode, eMutating, onEdit, onDelete, stepCount, isS
                             工程
                         </button>
                         <button
-                            className="btn btn-ghost btn-xs"
-                            style={{ color: '#dc2626' }}
+                            className="btn btn-danger btn-xs"
+                            style={{ fontSize: 11 }}
                             onClick={() => onDelete(ev)}
                             disabled={eMutating}
                         >
@@ -523,7 +519,7 @@ export default function ProjectDetail() {
                         : 'ロックなし — 編集モードで変更できます'}
                 </span>
                 {lockError && (
-                    <span style={{ fontSize: 12, color: '#dc2626' }}>{lockError}</span>
+                    <span style={{ fontSize: 12, color: 'var(--color-danger)' }}>{lockError}</span>
                 )}
                 <button
                     className={`btn btn-sm ${editMode ? 'btn-danger' : 'btn-primary'}`}
@@ -557,7 +553,7 @@ export default function ProjectDetail() {
                             <h2 className="section-title" style={{ margin: 0 }}>
                                 {eventTab === 'list' ? 'イベント一覧' : 'ガントチャート'}
                                 {localEvents.length > 0 && (
-                                    <span style={{ fontSize: 13, fontWeight: 400, color: '#6b7280', marginLeft: 8 }}>
+                                    <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--color-muted)', marginLeft: 8 }}>
                                         {localEvents.length} 件
                                     </span>
                                 )}
@@ -578,16 +574,16 @@ export default function ProjectDetail() {
                             </div>
                         </div>
                         {appliedPatternName ? (
-                            <div style={{ fontSize: 12, color: '#6b7280' }}>
+                            <div style={{ fontSize: 12, color: 'var(--color-muted)' }}>
                                 適用済み: {appliedPatternName}
                             </div>
                         ) : (
-                            <div style={{ fontSize: 12, color: '#9ca3af' }}>
+                            <div style={{ fontSize: 12, color: 'var(--color-subtle)' }}>
                                 パターン未適用
                             </div>
                         )}
                         {applyResult && (
-                            <div style={{ fontSize: 12, color: '#059669', marginTop: 3 }}>
+                            <div style={{ fontSize: 12, color: 'var(--color-success)', marginTop: 3 }}>
                                 ✓ 適用完了 — {applyResult.generated} 件生成
                                 {applyResult.carried    > 0 && ` / ${applyResult.carried} 件引き継ぎ`}
                                 {applyResult.restored   > 0 && ` / ${applyResult.restored} 件復元`}
@@ -597,7 +593,7 @@ export default function ProjectDetail() {
                             </div>
                         )}
                         {savePatternResult && (
-                            <div style={{ fontSize: 12, color: '#059669', marginTop: 3 }}>
+                            <div style={{ fontSize: 12, color: 'var(--color-success)', marginTop: 3 }}>
                                 ✓ パターン「{savePatternResult}」を保存しました
                             </div>
                         )}
@@ -701,16 +697,16 @@ export default function ProjectDetail() {
                                                 if (isExpanded) {
                                                     if (steps.length === 0) {
                                                         rows.push(
-                                                            <tr key={`empty-steps-${ev.id}`} style={{ background: '#f0f9ff' }}>
-                                                                {editMode && <td style={{ borderBottom: '1px solid #e0f2fe' }} />}
+                                                            <tr key={`empty-steps-${ev.id}`} style={{ background: '#eff6ff' }}>
+                                                                {editMode && <td style={{ borderBottom: '1px solid #bfdbfe' }} />}
                                                                 <td colSpan={subColSpan} style={{
-                                                                    paddingLeft: 40, fontSize: 12, color: '#9ca3af',
+                                                                    paddingLeft: 40, fontSize: 12, color: 'var(--color-subtle)',
                                                                     paddingTop: 6, paddingBottom: 6,
-                                                                    borderBottom: '1px solid #e0f2fe',
+                                                                    borderBottom: '1px solid #bfdbfe',
                                                                 }}>
                                                                     工程ステップなし
                                                                 </td>
-                                                                {editMode && <td style={{ borderBottom: '1px solid #e0f2fe' }} />}
+                                                                {editMode && <td style={{ borderBottom: '1px solid #bfdbfe' }} />}
                                                             </tr>
                                                         );
                                                     } else {
@@ -730,7 +726,7 @@ export default function ProjectDetail() {
                                                     // 展開時のアクション行（edit モードのみ）
                                                     if (editMode) {
                                                         rows.push(
-                                                            <tr key={`step-actions-${ev.id}`} style={{ background: '#f0f9ff' }}>
+                                                            <tr key={`step-actions-${ev.id}`} style={{ background: '#eff6ff' }}>
                                                                 <td style={{ borderBottom: '1px solid #bfdbfe' }} />
                                                                 <td colSpan={subColSpan} style={{
                                                                     paddingLeft: 40, paddingTop: 6, paddingBottom: 8,
@@ -739,7 +735,7 @@ export default function ProjectDetail() {
                                                                     <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
                                                                         <button
                                                                             className="btn btn-ghost btn-xs"
-                                                                            style={{ color: '#6366f1', fontSize: 12 }}
+                                                                            style={{ color: '#6366f1', fontSize: 11 }}
                                                                             onClick={() => setProcessStepModal({ event: ev, initialTab: 'custom' })}
                                                                         >
                                                                             ＋ 任意工程を追加
@@ -747,7 +743,7 @@ export default function ProjectDetail() {
                                                                         {steps.length > 0 && (
                                                                             <button
                                                                                 className="btn btn-ghost btn-xs"
-                                                                                style={{ color: '#6b7280', fontSize: 12 }}
+                                                                                style={{ color: 'var(--color-muted)', fontSize: 11 }}
                                                                                 onClick={() => setSaveProcessPatModal({ event: ev })}
                                                                             >
                                                                                 工程パターンとして保存

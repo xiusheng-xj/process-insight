@@ -164,12 +164,12 @@ function GanttRow({ project: p, minDate, dayW, todayX, headers, onTooltipShow, o
 
     return (
         <div
-            style={{ position: 'relative', height: ROW_H, borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}
+            style={{ position: 'relative', height: ROW_H, borderBottom: '1px solid var(--color-border-light)', cursor: 'pointer' }}
             onClick={onNavigate}
         >
             {/* Period grid lines */}
             {headers.map((h, i) => (
-                <div key={i} style={{ position: 'absolute', top: 0, bottom: 0, left: h.x, width: 1, background: '#f3f4f6', pointerEvents: 'none' }} />
+                <div key={i} style={{ position: 'absolute', top: 0, bottom: 0, left: h.x, width: 1, background: 'var(--color-border-light)', pointerEvents: 'none' }} />
             ))}
 
             {/* Today line */}
@@ -347,23 +347,12 @@ export default function ProjectGantt() {
                 </div>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                     {/* Scale toggle */}
-                    <div style={{ display: 'flex', background: '#f3f4f6', borderRadius: 6, padding: 2, gap: 2 }}>
+                    <div style={{ display: 'flex', gap: 4 }}>
                         {['month', 'week', 'day'].map(s => (
                             <button
                                 key={s}
+                                className={`gantt-scale-btn${scale === s ? ' active' : ''}`}
                                 onClick={() => setScale(s)}
-                                style={{
-                                    padding: '4px 14px',
-                                    fontSize: 13,
-                                    borderRadius: 4,
-                                    cursor: 'pointer',
-                                    border: 'none',
-                                    background: scale === s ? '#fff' : 'transparent',
-                                    color: scale === s ? '#1d4ed8' : '#6b7280',
-                                    fontWeight: scale === s ? 600 : 400,
-                                    boxShadow: scale === s ? '0 1px 3px rgba(0,0,0,0.12)' : 'none',
-                                    transition: 'all 0.12s',
-                                }}
                             >
                                 {SCALE_LABEL[s]}
                             </button>
@@ -393,7 +382,7 @@ export default function ProjectGantt() {
 
             {/* Gantt table */}
             {!loading && !error && (
-                <div style={{ flex: 1, overflow: 'auto', border: '1px solid #e5e7eb', borderRadius: 8, background: '#fff', marginBottom: 16 }}>
+                <div className="gantt-container" style={{ flex: 1, overflow: 'auto', marginBottom: 16 }}>
                     {!minDate ? (
                         <div className="empty-state">表示できる案件がありません</div>
                     ) : (
@@ -402,19 +391,19 @@ export default function ProjectGantt() {
                             {/* Sticky header row */}
                             <div style={{ display: 'flex', height: HEADER_H, position: 'sticky', top: 0, zIndex: 20 }}>
                                 {/* Corner cell */}
-                                <div style={{ width: LEFT_W, flexShrink: 0, position: 'sticky', left: 0, zIndex: 30, background: '#f9fafb', borderRight: '1px solid #e5e7eb', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', paddingLeft: 14 }}>
-                                    <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>案件</span>
+                                <div style={{ width: LEFT_W, flexShrink: 0, position: 'sticky', left: 0, zIndex: 30, background: '#f8fafc', borderRight: '1px solid var(--color-border)', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', paddingLeft: 14 }}>
+                                    <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '.04em' }}>案件</span>
                                 </div>
                                 {/* Period labels */}
-                                <div style={{ flex: 1, position: 'relative', background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                                <div style={{ flex: 1, position: 'relative', background: '#f8fafc', borderBottom: '1px solid var(--color-border)' }}>
                                     {headers.map((h, i) => (
-                                        <div key={i} style={{ position: 'absolute', left: h.x, top: 0, bottom: 0, display: 'flex', alignItems: 'center', borderLeft: '1px solid #e5e7eb', paddingLeft: 5 }}>
-                                            <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 500, whiteSpace: 'nowrap' }}>{h.label}</span>
+                                        <div key={i} style={{ position: 'absolute', left: h.x, top: 0, bottom: 0, display: 'flex', alignItems: 'center', borderLeft: '1px solid var(--color-border)', paddingLeft: 5 }}>
+                                            <span style={{ fontSize: 11, color: 'var(--color-muted)', fontWeight: 500, whiteSpace: 'nowrap' }}>{h.label}</span>
                                         </div>
                                     ))}
                                     {/* Today line in header */}
                                     {todayX != null && (
-                                        <div style={{ position: 'absolute', left: todayX - 1, top: 0, bottom: 0, width: 2, background: '#ef4444', opacity: 0.5 }} />
+                                        <div style={{ position: 'absolute', left: todayX - 1, top: 0, bottom: 0, width: 2, background: 'var(--color-danger)', opacity: 0.5 }} />
                                     )}
                                 </div>
                             </div>
@@ -430,16 +419,19 @@ export default function ProjectGantt() {
                                     const hc = HC[p.health_status] || '#d1d5db';
                                     const hl = HL[p.health_status] || '—';
                                     const borderColor = p.health_status === 'danger'
-                                        ? '#ef4444'
+                                        ? 'var(--color-danger)'
                                         : p.health_status === 'caution'
-                                        ? '#f59e0b'
+                                        ? 'var(--color-warning)'
                                         : 'transparent';
+                                    const healthCls = p.effective_status === 'completed' ? 'health-completed'
+                                        : { healthy: 'health-healthy', caution: 'health-caution', danger: 'health-danger' }[p.health_status] || '';
 
                                     return (
-                                        <div key={p.id} style={{ display: 'flex', height: ROW_H, borderBottom: '1px solid #f3f4f6' }}>
+                                        <div key={p.id} style={{ display: 'flex', height: ROW_H, borderBottom: '1px solid var(--color-border-light)' }}>
                                             {/* Left panel — sticky */}
                                             <div
-                                                style={{ width: LEFT_W, flexShrink: 0, position: 'sticky', left: 0, zIndex: 10, background: '#fff', borderRight: '1px solid #e5e7eb', display: 'flex', cursor: 'pointer' }}
+                                                className="gantt-left-row"
+                                                style={{ width: LEFT_W, flexShrink: 0, position: 'sticky', left: 0, zIndex: 10, background: 'var(--color-card)', borderRight: '1px solid var(--color-border)', display: 'flex', cursor: 'pointer' }}
                                                 onClick={() => navigate(`/projects/${p.id}`)}
                                                 onMouseEnter={e => showTooltip(e, <ProjectTooltip p={p} />)}
                                                 onMouseMove={moveTooltip}
@@ -448,16 +440,16 @@ export default function ProjectGantt() {
                                                 {/* Health indicator strip */}
                                                 <div style={{ width: 3, flexShrink: 0, background: borderColor }} />
                                                 <div style={{ flex: 1, padding: '8px 10px', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                                                    <div style={{ fontSize: 13, fontWeight: 500, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                         {p.project_name}
                                                     </div>
-                                                    <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 5 }}>{p.project_no}</div>
+                                                    <div style={{ fontSize: 10.5, color: 'var(--color-subtle)', marginBottom: 5, fontFamily: 'var(--font-mono)' }}>{p.project_no}</div>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                                                        <div style={{ width: 64, height: 4, background: '#e5e7eb', borderRadius: 2, overflow: 'hidden' }}>
-                                                            <div style={{ width: `${pct}%`, height: '100%', background: hc, borderRadius: 2 }} />
+                                                        <div className="progress-bar-wrap" style={{ width: 60 }}>
+                                                            <div className="progress-bar-fill" style={{ width: `${pct}%`, background: hc }} />
                                                         </div>
-                                                        <span style={{ fontSize: 10, color: '#6b7280' }}>{pct}%</span>
-                                                        <span style={{ fontSize: 10, background: hc + '22', color: hc, padding: '1px 5px', borderRadius: 3, fontWeight: 600 }}>{hl}</span>
+                                                        <span style={{ fontSize: 10, color: 'var(--color-muted)' }}>{pct}%</span>
+                                                        <span className={`health-badge ${healthCls}`}>{hl}</span>
                                                     </div>
                                                 </div>
                                             </div>

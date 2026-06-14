@@ -21,11 +21,11 @@ const HEALTH_STATUS_MAP = {
 const MANUAL_STATUSES = new Set(['on_hold', 'cancelled']);
 
 function RemainingDays({ days }) {
-    if (days == null) return <span style={{ color: '#9ca3af' }}>—</span>;
+    if (days == null) return <span style={{ color: 'var(--color-subtle)' }}>—</span>;
     const n = Number(days);
-    if (n > 3)  return <span style={{ color: '#059669', fontSize: 13 }}>あと{n}日</span>;
-    if (n >= 0) return <span style={{ color: '#d97706', fontSize: 13, fontWeight: 600 }}>{n === 0 ? '今日' : `あと${n}日`}</span>;
-    return <span style={{ color: '#dc2626', fontSize: 13, fontWeight: 600 }}>超過{Math.abs(n)}日</span>;
+    if (n > 3)  return <span style={{ color: 'var(--color-success)', fontSize: 13 }}>あと{n}日</span>;
+    if (n >= 0) return <span style={{ color: 'var(--color-warning)', fontSize: 13, fontWeight: 600 }}>{n === 0 ? '今日' : `あと${n}日`}</span>;
+    return <span style={{ color: 'var(--color-danger)', fontSize: 13, fontWeight: 600 }}>超過{Math.abs(n)}日</span>;
 }
 
 export default function ProjectList() {
@@ -118,8 +118,8 @@ export default function ProjectList() {
                                     <th style={{ textAlign: 'center' }}>アラーム</th>
                                     <th>次イベント</th>
                                     <th>残日数</th>
-                                    <th>ロック状態</th>
-                                    <th style={{ width: 56 }}></th>
+                                    <th>ロック</th>
+                                    <th style={{ width: 48 }}></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -139,16 +139,16 @@ export default function ProjectList() {
                                         return (
                                             <tr key={p.id} onClick={() => navigate(`/projects/${p.id}`)}>
                                                 <td>
-                                                    <span style={{ fontFamily: 'monospace', fontSize: 13, color: '#374151' }}>
+                                                    <span className="mono" style={{ fontSize: 12.5, color: 'var(--color-muted)' }}>
                                                         {p.project_no}
                                                     </span>
                                                 </td>
-                                                <td style={{ fontWeight: 500 }}>{p.project_name}</td>
+                                                <td style={{ fontWeight: 600, color: 'var(--color-text)' }}>{p.project_name}</td>
                                                 <td>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                                                         <span className={`badge ${st.cls}`}>{st.label}</span>
                                                         {showProgress && (
-                                                            <span style={{ fontSize: 11, color: '#9ca3af', whiteSpace: 'nowrap' }}>
+                                                            <span style={{ fontSize: 11, color: 'var(--color-subtle)', whiteSpace: 'nowrap' }}>
                                                                 {p.progress_done}/{p.progress_total}
                                                             </span>
                                                         )}
@@ -157,36 +157,36 @@ export default function ProjectList() {
                                                 <td>
                                                     {hl.cls
                                                         ? <span className={`badge ${hl.cls}`}>{hl.label}</span>
-                                                        : <span style={{ color: '#9ca3af' }}>—</span>}
+                                                        : <span style={{ color: 'var(--color-subtle)' }}>—</span>}
                                                 </td>
                                                 <td style={{ textAlign: 'center' }}>
-                                                    <span style={{ fontSize: 13, color: alarmCount > 0 ? '#374151' : '#d1d5db' }}>
-                                                        {alarmCount}件
-                                                    </span>
+                                                    {alarmCount > 0
+                                                        ? <span className="count-badge">{alarmCount}</span>
+                                                        : <span style={{ color: 'var(--color-border)', fontSize: 12 }}>—</span>}
                                                 </td>
-                                                <td style={{ fontSize: 13 }}>
+                                                <td style={{ fontSize: 13, color: 'var(--color-text)' }}>
                                                     {p.next_event_name
                                                         ? p.next_event_name
-                                                        : <span style={{ color: '#9ca3af' }}>
+                                                        : <span style={{ color: 'var(--color-subtle)' }}>
                                                             {p.effective_status === 'completed' ? '完了' : '—'}
                                                           </span>}
                                                 </td>
                                                 <td>
                                                     {p.next_event_name
                                                         ? <RemainingDays days={p.remaining_days} />
-                                                        : <span style={{ color: '#9ca3af' }}>—</span>}
+                                                        : <span style={{ color: 'var(--color-subtle)' }}>—</span>}
                                                 </td>
                                                 <td>
                                                     {p.is_locked
-                                                        ? <span style={{ fontSize: 13, color: '#dc2626' }}>
+                                                        ? <span style={{ fontSize: 12, color: 'var(--color-warning)', whiteSpace: 'nowrap' }}>
                                                             🔒 {p.current_locked_by}
                                                           </span>
-                                                        : <span style={{ color: '#d1d5db', fontSize: 12 }}>—</span>}
+                                                        : <span style={{ color: 'var(--color-border)', fontSize: 12 }}>—</span>}
                                                 </td>
                                                 <td onClick={e => e.stopPropagation()}>
                                                     <button
                                                         className="btn btn-ghost btn-xs"
-                                                        style={{ color: '#9ca3af' }}
+                                                        style={{ color: 'var(--color-subtle)' }}
                                                         title="ゴミ箱へ移動"
                                                         disabled={mutating}
                                                         onClick={() => setDeleteTarget(p)}

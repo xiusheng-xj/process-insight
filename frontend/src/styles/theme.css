@@ -1,0 +1,53 @@
+/* ============================================================
+   theme.css  デザイントークン（CSS カスタムプロパティ）
+   ============================================================ */
+:root {
+  /* ── カラー ── */
+  --color-bg:           #f3f6fa;
+  --color-card:         #ffffff;
+  --color-text:         #0f172a;
+  --color-muted:        #64748b;
+  --color-subtle:       #94a3b8;
+  --color-border:       #e2e8f0;
+  --color-border-light: #f1f5f9;
+
+  --color-primary:      #2563eb;
+  --color-primary-dark: #1e3a5f;
+  --color-primary-bg:   #eff6ff;
+
+  --color-success:      #10b981;
+  --color-success-bg:   #dcfce7;
+  --color-success-text: #166534;
+
+  --color-warning:      #f59e0b;
+  --color-warning-bg:   #fef3c7;
+  --color-warning-text: #92400e;
+
+  --color-danger:       #ef4444;
+  --color-danger-bg:    #fee2e2;
+  --color-danger-text:  #991b1b;
+
+  --color-info-bg:      #dbeafe;
+  --color-info-text:    #1e40af;
+
+  /* ── 角丸 ── */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius:    8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  /* ── 影 ── */
+  --shadow-xs: 0 1px 2px rgba(15,23,42,.04);
+  --shadow-sm: 0 1px 3px rgba(15,23,42,.06), 0 1px 2px rgba(15,23,42,.04);
+  --shadow:    0 2px 8px rgba(15,23,42,.07), 0 1px 3px rgba(15,23,42,.04);
+  --shadow-md: 0 4px 20px rgba(15,23,42,.09), 0 2px 6px rgba(15,23,42,.05);
+  --shadow-lg: 0 8px 32px rgba(15,23,42,.12), 0 2px 8px rgba(15,23,42,.06);
+
+  /* ── トランジション ── */
+  --transition: .15s ease;
+  --transition-slow: .25s ease;
+
+  /* ── フォント ── */
+  --font-mono: ui-monospace, 'Cascadia Code', 'Consolas', monospace;
+}

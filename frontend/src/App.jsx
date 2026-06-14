@@ -78,22 +78,24 @@ function UsernameGate({ children }) {
 
     return (
         <div className="overlay">
-            <div className="modal" style={{ width: 360, textAlign: 'center' }}>
-                <h2 className="modal-title" style={{ marginBottom: 8 }}>工程管理システム</h2>
-                <p style={{ color: '#6b7280', fontSize: 13, marginBottom: 20 }}>
+            <div className="modal" style={{ width: 380, textAlign: 'center' }}>
+                <div style={{ marginBottom: 6, fontSize: 28 }}>🗓️</div>
+                <h2 className="modal-title" style={{ marginBottom: 8, fontSize: 19 }}>工程管理システム</h2>
+                <p style={{ color: 'var(--color-muted)', fontSize: 13, marginBottom: 24, lineHeight: 1.6 }}>
                     編集ロック管理のためユーザー名を入力してください。
                 </p>
                 <form onSubmit={handleSave}>
-                    <div className="form-group">
+                    <div className="form-group" style={{ textAlign: 'left' }}>
+                        <label className="form-label">ユーザー名</label>
                         <input
                             className="form-control"
-                            placeholder="例: 山田太郎"
+                            placeholder="例: 山田 太郎"
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             autoFocus
                         />
                     </div>
-                    <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={!input.trim()}>
+                    <button type="submit" className="btn btn-primary" style={{ width: '100%', height: 42, fontSize: 14 }} disabled={!input.trim()}>
                         開始する
                     </button>
                 </form>

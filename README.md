@@ -28,35 +28,78 @@
 - Node.js v18 以上
 - PostgreSQL 18（ローカル起動済み）
 
-### 1. 環境変数の設定
+### 1. リポジトリ clone
 
 ```bash
-# バックエンド
-cp backend/.env.example backend/.env
-# backend/.env を編集して DB_PASSWORD などを設定
+git clone https://github.com/xiusheng-xj/process-schedule.git
+cd process-schedule
+```
 
-# フロントエンド
+### 2. 環境変数の設定
+
+**Git Bash / macOS / Linux:**
+```bash
+cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
 ```
 
-### 2. データベース作成
-
-```sql
--- psql で実行
-CREATE DATABASE "process-schedule";
+**Windows PowerShell:**
+```powershell
+Copy-Item backend\.env.example backend\.env
+Copy-Item frontend\.env.example frontend\.env
 ```
 
-スキーマは `backend/src/db/schema*.sql` を順に適用してください。
+`backend/.env` を開き、`DB_PASSWORD=your_password_here` を実際の PostgreSQL パスワードに変更してください。
 
+### 3. データベース作成
+
+**Git Bash / macOS / Linux:**
 ```bash
-# 例（PostgreSQL 18 on Windows）
-set PGPASSWORD=your_password
-psql -U postgres -d process-schedule -f backend/src/db/schema.sql
-psql -U postgres -d process-schedule -f backend/src/db/schema_v2.sql
-# ... schema_v15.sql まで順番に適用
+export PGPASSWORD=your_password
+psql -U postgres -c 'CREATE DATABASE "process-schedule";'
 ```
 
-### 3. 依存パッケージのインストール
+**Windows PowerShell:**
+```powershell
+$env:PGPASSWORD = "your_password"
+& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -c 'CREATE DATABASE "process-schedule";'
+```
+
+### 4. スキーマ適用
+
+`backend/src/db/` にある SQL ファイルを **番号順** に適用してください。
+
+**Git Bash / macOS / Linux:**
+```bash
+export PGPASSWORD=your_password
+for f in backend/src/db/schema.sql backend/src/db/schema_v{2..15}.sql; do
+  echo "Applying $f..."
+  psql -U postgres -d process-schedule -f "$f"
+done
+```
+
+**Windows PowerShell（psql が PATH にない場合は絶対パスで）:**
+```powershell
+$env:PGPASSWORD = "your_password"
+$psql = "C:\Program Files\PostgreSQL\18\bin\psql.exe"
+& $psql -U postgres -d process-schedule -f backend/src/db/schema.sql
+& $psql -U postgres -d process-schedule -f backend/src/db/schema_v2.sql
+& $psql -U postgres -d process-schedule -f backend/src/db/schema_v3.sql
+& $psql -U postgres -d process-schedule -f backend/src/db/schema_v4.sql
+& $psql -U postgres -d process-schedule -f backend/src/db/schema_v5.sql
+& $psql -U postgres -d process-schedule -f backend/src/db/schema_v6.sql
+& $psql -U postgres -d process-schedule -f backend/src/db/schema_v7.sql
+& $psql -U postgres -d process-schedule -f backend/src/db/schema_v8.sql
+& $psql -U postgres -d process-schedule -f backend/src/db/schema_v9.sql
+& $psql -U postgres -d process-schedule -f backend/src/db/schema_v10.sql
+& $psql -U postgres -d process-schedule -f backend/src/db/schema_v11.sql
+& $psql -U postgres -d process-schedule -f backend/src/db/schema_v12.sql
+& $psql -U postgres -d process-schedule -f backend/src/db/schema_v13.sql
+& $psql -U postgres -d process-schedule -f backend/src/db/schema_v14.sql
+& $psql -U postgres -d process-schedule -f backend/src/db/schema_v15.sql
+```
+
+### 5. 依存パッケージのインストール
 
 ```bash
 # バックエンド
@@ -67,7 +110,7 @@ npm install
 cd ../frontend
 npm install
 
-# ルート（Playwright）
+# ルート（Playwright E2E テスト用）
 cd ..
 npm install
 ```
@@ -80,7 +123,7 @@ npm install
 
 ```bash
 cd backend
-node src/index.js
+npm start
 # → http://localhost:6101 で起動
 ```
 
@@ -88,15 +131,17 @@ node src/index.js
 
 ```bash
 cd frontend
-npx vite --port 6100
-# → http://localhost:6100 で起動
+npm run dev
+# → http://localhost:6100 で起動（vite.config.js でポート固定済み）
 ```
+
+> 開発サーバーでは `/api` へのリクエストは自動的に `http://localhost:6101` へプロキシされます。
 
 ### プロダクションビルド
 
 ```bash
 cd frontend
-npx vite build
+npm run build
 # → frontend/dist/ に出力
 ```
 
@@ -116,14 +161,14 @@ npx vite build
 ## ディレクトリ構成
 
 ```
-Process_Schedule/
+process-schedule/
 ├── backend/
 │   ├── src/
 │   │   ├── index.js          # エントリーポイント
-│   │   ├── db/               # DB接続・スキーマSQL
+│   │   ├── db/               # DB接続・スキーマSQL (schema.sql〜schema_v15.sql)
 │   │   ├── routes/           # APIルート
 │   │   └── middleware/
-│   ├── .env.example
+│   ├── .env.example          # 環境変数テンプレート
 │   └── package.json
 ├── frontend/
 │   ├── src/
@@ -131,7 +176,8 @@ Process_Schedule/
 │   │   ├── api/              # API クライアント
 │   │   ├── components/       # 共通コンポーネント
 │   │   └── pages/            # ページコンポーネント
-│   ├── .env.example
+│   ├── .env.example          # 環境変数テンプレート
+│   ├── vite.config.js        # Vite設定（ポート6100固定・APIプロキシ）
 │   └── package.json
 ├── tests/
 │   └── e2e/                  # Playwright E2E テスト
@@ -140,7 +186,7 @@ Process_Schedule/
 │   ├── PORT_MANAGEMENT.md
 │   └── sql/
 │       └── archive/          # 実行済みSQLアーカイブ
-├── scripts/                  # ユーティリティスクリプト
+├── scripts/                  # ポート管理ユーティリティ
 └── README.md
 ```
 
@@ -148,8 +194,9 @@ Process_Schedule/
 
 ## E2E テスト
 
+backend と frontend が起動中の状態でルートから実行：
+
 ```bash
-# ルートで実行（backend・frontend が起動中であること）
 node tests/e2e/e2e-check.js
 ```
 
@@ -161,3 +208,4 @@ node tests/e2e/e2e-check.js
 - `backend/.env` と `frontend/.env` はそれぞれ `.env.example` をコピーして作成
 - 論理削除を採用（物理 DELETE は原則禁止）
 - `project_events.diff_days` は PostgreSQL 生成列（手動更新不要）
+- Windows で `cp` は Git Bash または PowerShell の `Copy-Item` を使用すること

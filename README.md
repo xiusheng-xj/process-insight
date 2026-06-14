@@ -72,7 +72,7 @@ $env:PGPASSWORD = "your_password"
 **Git Bash / macOS / Linux:**
 ```bash
 export PGPASSWORD=your_password
-for f in backend/src/db/schema.sql backend/src/db/schema_v{2..15}.sql; do
+for f in backend/src/db/schema.sql backend/src/db/schema_v{2..17}.sql; do
   echo "Applying $f..."
   psql -U postgres -d process-schedule -f "$f"
 done
@@ -97,9 +97,44 @@ $psql = "C:\Program Files\PostgreSQL\18\bin\psql.exe"
 & $psql -U postgres -d process-schedule -f backend/src/db/schema_v13.sql
 & $psql -U postgres -d process-schedule -f backend/src/db/schema_v14.sql
 & $psql -U postgres -d process-schedule -f backend/src/db/schema_v15.sql
+& $psql -U postgres -d process-schedule -f backend/src/db/schema_v16.sql
+& $psql -U postgres -d process-schedule -f backend/src/db/schema_v17.sql
 ```
 
-### 5. 依存パッケージのインストール
+### 5. マスターデータ投入
+
+```bash
+# Git Bash / macOS / Linux
+psql -U postgres -d process-schedule -f backend/src/db/seed.sql
+
+# Windows PowerShell
+& $psql -U postgres -d process-schedule -f backend/src/db/seed.sql
+```
+
+### 6. デモデータ投入（任意）
+
+実際の画面表示を確認したい場合は demo_data.sql を追加で投入してください。
+
+```bash
+# Git Bash / macOS / Linux
+psql -U postgres -d process-schedule -f backend/src/db/demo_data.sql
+
+# Windows PowerShell
+& $psql -U postgres -d process-schedule -f backend/src/db/demo_data.sql
+```
+
+デモデータの内容：
+
+| 案件 | 内容 | 状態 |
+|------|------|------|
+| DEMO-001 | 標準案件 | 作業中（前半完了・後半未着） |
+| DEMO-002 | 遅延案件 | 作業中（4件 overdue → 危険） |
+| DEMO-003 | 完了案件 | 全イベント完了 |
+| DEMO-004 | EOL案件  | カスタムイベント・前半完了 |
+
+> demo_data.sql は CURRENT_DATE 基準で日付を計算するため、いつ実行しても同じ見た目になります。
+
+### 7. 依存パッケージのインストール
 
 ```bash
 # バックエンド

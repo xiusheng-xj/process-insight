@@ -7,7 +7,7 @@ const EVENT_STATUSES = [
     { value: 'delayed',     label: '遅延' },
 ];
 
-export default function EventFormModal({ mode, event, onClose, onSubmit, loading }) {
+export default function EventFormModal({ mode, event, onClose, onSubmit, loading, locations = [], resources = [] }) {
     const isEdit = mode === 'edit';
 
     const [form, setForm] = useState({
@@ -17,10 +17,27 @@ export default function EventFormModal({ mode, event, onClose, onSubmit, loading
         actual_date:      event?.actual_date?.slice(0, 10)       || '',
         status:           event?.status                          || 'pending',
         owner_department: event?.owner_department                || '',
+        location_id:      event?.location_id != null ? String(event.location_id) : '',
+        resource_id:      event?.resource_id != null ? String(event.resource_id) : '',
     });
     const [err, setErr] = useState('');
 
     const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+    /* リソース選択時：ロケーション未設定なら既定ロケーションを自動セット */
+    const onResourceChange = (e) => {
+        const rid = e.target.value;
+        setForm((f) => {
+            const next = { ...f, resource_id: rid };
+            const r = resources.find((x) => String(x.id) === rid);
+            if (r && r.home_location_id != null && !f.location_id) {
+                next.location_id = String(r.home_location_id);
+            }
+            return next;
+        });
+    };
+
+    const selectedResource = resources.find((x) => String(x.id) === form.resource_id) || null;
 
     /* プレビュー差異計算（入力中リアルタイム表示） */
     const previewDiff = (() => {
@@ -45,6 +62,8 @@ export default function EventFormModal({ mode, event, onClose, onSubmit, loading
                 actual_date:      form.actual_date      || null,
                 status:           form.status,
                 owner_department: form.owner_department || null,
+                location_id:      form.location_id ? Number(form.location_id) : null,
+                resource_id:      form.resource_id ? Number(form.resource_id) : null,
                 updated_by:       sessionStorage.getItem('userName') || 'anonymous',
             });
         } catch (ex) {
@@ -92,6 +111,38 @@ export default function EventFormModal({ mode, event, onClose, onSubmit, loading
                             placeholder="例: 設計部"
                         />
                     </div>
+
+                    <div className="form-row">
+                        <div className="form-group">
+                            <label className="form-label">ロケーション</label>
+                            <select className="form-control" value={form.location_id} onChange={set('location_id')}>
+                                <option value="">— 未設定 —</option>
+                                {locations.map((l) => (
+                                    <option key={l.id} value={l.id}>{l.location_name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">リソース/設備</label>
+                            <select className="form-control" value={form.resource_id} onChange={onResourceChange}>
+                                <option value="">— 未設定 —</option>
+                                {resources.map((r) => (
+                                    <option key={r.id} value={r.id}>{r.resource_name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    {selectedResource && (
+                        <div style={{ marginBottom: 14, padding: '8px 12px', background: '#f0f9ff', borderRadius: 6, fontSize: 12, color: '#374151' }}>
+                            選択中リソース：<strong>{selectedResource.resource_name}</strong>
+                            <span style={{ marginLeft: 8, color: '#6b7280' }}>
+                                既定ロケーション: {selectedResource.home_location_name || '—'}
+                                ／ capacity: {selectedResource.capacity}
+                                ／ 部門: {selectedResource.department_code || '—'}
+                            </span>
+                        </div>
+                    )}
 
                     <div className="form-row">
                         <div className="form-group">

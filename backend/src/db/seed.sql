@@ -134,4 +134,31 @@ ON CONFLICT (id) DO NOTHING;
 
 SELECT setval('process_pattern_steps_id_seq', GREATEST((SELECT MAX(id) FROM process_pattern_steps), 8));
 
+-- ─────────────────────────────────────────────
+-- 6. locations（場所マスタ） ※ schema_v18 で追加
+-- ─────────────────────────────────────────────
+INSERT INTO locations (id, location_code, location_name, location_type, region, sort_order) VALUES
+    (1, 'LOC_SAITAMA',   '埼玉工場',   'factory',   '関東', 10),
+    (2, 'LOC_OSAKA',     '大阪工場',   'factory',   '関西', 20),
+    (3, 'LOC_HQ_TEST',   '本社試験室', 'test_room', '関東', 30),
+    (4, 'LOC_PARTNER_A', '協力会社A',  'partner',   '関東', 40),
+    (5, 'LOC_OVERSEAS',  '海外拠点',   'overseas',  '海外', 50)
+ON CONFLICT (id) DO NOTHING;
+
+SELECT setval('locations_id_seq', GREATEST((SELECT MAX(id) FROM locations), 5));
+
+-- ─────────────────────────────────────────────
+-- 7. resources（設備・能力枠マスタ） ※ schema_v18 で追加
+--    home_location_id で locations に紐付け。REVIEW-D のみ capacity=2。
+-- ─────────────────────────────────────────────
+INSERT INTO resources (id, resource_code, resource_name, resource_type, home_location_id, department_code, capacity, sort_order) VALUES
+    (1, 'MC-01',       'マシニングセンタ MC-01', 'machine',        1, 'D', 1, 10),
+    (2, 'THERMO-01',   '恒温槽',                 'test_equipment', 3, 'C', 1, 20),
+    (3, 'EMC-ROOM',    'EMC試験室',              'test_equipment', 3, 'C', 1, 30),
+    (4, 'ASSY-LINE-A', '組立ラインA',            'line',           2, 'B', 1, 40),
+    (5, 'REVIEW-D',    'D部門 設計レビュー枠',   'review_slot',    1, 'D', 2, 50)
+ON CONFLICT (id) DO NOTHING;
+
+SELECT setval('resources_id_seq', GREATEST((SELECT MAX(id) FROM resources), 5));
+
 COMMIT;

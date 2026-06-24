@@ -23,6 +23,8 @@ import ProcessStepModal          from '../components/ProcessStepModal';
 import ProcessStepEditModal      from '../components/ProcessStepEditModal';
 import SaveProcessPatternModal   from '../components/SaveProcessPatternModal';
 import { reorderEvents }         from '../api/events';
+import { fetchLocations }        from '../api/locations';
+import { fetchResources }        from '../api/resources';
 import EventFormModal            from '../components/EventFormModal';
 import ApplyPatternModal         from '../components/ApplyPatternModal';
 import ProjectInfoCard           from '../components/ProjectInfoCard';
@@ -293,6 +295,14 @@ export default function ProjectDetail() {
     const { data: alerts,  reload: reloadAlerts, resolve: resolveAlert } = useAlerts(id, { is_resolved: false });
     const { locked, lockedBy, myLock, lockError, acquire, release } = useLock(id);
     const { create, update, remove, loading: eMutating, error: eMutError } = useEventMutations(id, reloadEvents);
+
+    /* ── ロケーション / リソース マスタ（工程編集用） ── */
+    const [locations, setLocations] = useState([]);
+    const [resources, setResources] = useState([]);
+    useEffect(() => {
+        fetchLocations({ active: true }).then(setLocations).catch(() => {});
+        fetchResources({ active: true }).then(setResources).catch(() => {});
+    }, []);
 
     /* ── マイルストーンパターン ── */
     const [patterns, setPatterns]         = useState([]);
@@ -773,6 +783,8 @@ export default function ProjectDetail() {
                 <EventFormModal
                     mode={eventModal.mode}
                     event={eventModal.event}
+                    locations={locations}
+                    resources={resources}
                     onClose={() => setEventModal(null)}
                     onSubmit={handleEventSubmit}
                     loading={eMutating}

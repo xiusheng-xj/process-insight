@@ -85,7 +85,7 @@ $env:PGPASSWORD = "your_password"
 **Git Bash / macOS / Linux:**
 ```bash
 export PGPASSWORD=your_password
-for f in backend/src/db/schema.sql backend/src/db/schema_v{2..17}.sql; do
+for f in backend/src/db/schema.sql backend/src/db/schema_v{2..18}.sql; do
   echo "Applying $f..."
   psql -U postgres -d process-schedule -f "$f"
 done
@@ -112,9 +112,12 @@ $psql = "C:\Program Files\PostgreSQL\18\bin\psql.exe"
 & $psql -U postgres -d process-schedule -f backend/src/db/schema_v15.sql
 & $psql -U postgres -d process-schedule -f backend/src/db/schema_v16.sql
 & $psql -U postgres -d process-schedule -f backend/src/db/schema_v17.sql
+& $psql -U postgres -d process-schedule -f backend/src/db/schema_v18.sql
 ```
 
 ### 5. マスターデータ投入
+
+`seed.sql` は工程マスタ・マイルストーン/工程パターンに加え、**ロケーション(`locations`) と リソース(`resources`) の初期マスタ**も投入します（schema_v18 適用後に実行）。
 
 ```bash
 # Git Bash / macOS / Linux
@@ -250,6 +253,32 @@ process-schedule/
 
 ---
 
+## ロケーション / リソース（工程属性）
+
+工程（`project_events`）に「場所」と「設備・能力枠」を別属性として持たせます（schema_v18 で追加）。
+
+| 概念 | テーブル | 意味 | 例 |
+|------|---------|------|----|
+| **ロケーション** | `locations` | 場所。移動コスト・LT・拠点偏りの分析に効く | 埼玉工場 / 大阪工場 / 本社試験室 / 協力会社A / 海外拠点 |
+| **リソース/設備** | `resources` | 工程を実行する設備・ライン・能力枠。重複/キャパ検出に効く | MC-01 / 恒温槽 / EMC試験室 / 組立ラインA / D部門 設計レビュー枠 |
+
+- 工程編集画面でロケーションとリソースをプルダウン選択できます。
+- リソースを選ぶとロケーション未設定時は **リソースの既定ロケーション(`home_location_id`)** を自動補完します。
+- `resources.capacity` は同一日に並行実行可能な工程数（例: `REVIEW-D` のみ capacity=2）。
+- 「同一日程 × 同一工程 × 同一リソース」がキャパを超えた場合の**重複検出は後続フェーズ（未実装）**です。本リリースは属性の保持・入力までを実装します。
+
+### 投入順序（重要）
+
+```text
+1. schema.sql 〜 schema_v18.sql を順番に適用
+2. seed.sql            … 工程/パターン + locations/resources 初期マスタ
+3. npm run seed:demo   … デモ案件 PIDEMO-01〜10（任意）
+```
+
+`seed:demo` は `seed.sql` 適用済みを前提とします（locations/resources が無くても失敗はせず、リソース割当を NULL でスキップします）。
+
+---
+
 ## デモ環境（動画撮影用）
 
 操作デモ動画の撮影シナリオ（案件一覧・複数案件ガント・予実比較・新規登録・工程負荷）を
@@ -267,6 +296,8 @@ npm run seed:demo
 - 全日付は `CURRENT_DATE` 基準で計算され、いつ実行しても同じ見た目になります
 - マイルストーンパターン3（リピート）/4（EOL）の工程定義が未登録の場合、
   シーン4（パターン選択→自動生成）が成立するよう自動で補完します
+- 設計集中クラスタ（`PIDEMO-06/08/10`）の KK日（設計系）に **リソース `REVIEW-D`（capacity 2）を同一日程で割当**し、
+  後続フェーズの工程重複検出を試せるデータ状態を作ります（重複検出自体は未実装）
 - 実行末尾に、画面と同一ロジックで算出した各案件の状態（正常/注意/遅延/保留/完了）を表示します
 
 > 前提: `schema.sql`〜`schema_v17.sql` と `seed.sql`（マスターデータ）が適用済みであること。

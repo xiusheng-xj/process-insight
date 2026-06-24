@@ -18,6 +18,8 @@ const projectProcessStepsRouter  = require('./routes/projectProcessSteps');
 const applyProcessPatternRouter  = require('./routes/applyProcessPattern');
 const saveProcessPatternRouter   = require('./routes/saveProcessPattern');
 const milestonePatternsRouter    = require('./routes/milestonePatterns');
+const locationsRouter            = require('./routes/locations');
+const resourcesRouter            = require('./routes/resources');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -54,6 +56,8 @@ app.use('/api/projects/:projectId/process-steps',     projectProcessStepsRouter)
 app.use('/api/projects/:projectId/events/:eventId/apply-process-pattern', applyProcessPatternRouter);
 app.use('/api/projects/:projectId/events/:eventId/save-process-pattern',  saveProcessPatternRouter);
 app.use('/api/milestone-patterns',                                        milestonePatternsRouter);
+app.use('/api/locations',                             locationsRouter);
+app.use('/api/resources',                             resourcesRouter);
 
 app.use(errorHandler);
 

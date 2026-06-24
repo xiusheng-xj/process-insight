@@ -2,6 +2,32 @@ const express = require('express');
 const router = express.Router({ mergeParams: true });
 const db = require('../db');
 
+// resource_id 指定かつ location 未指定のとき home_location_id を補完して返す。
+// 戻り値 { locationId, resourceId }（resourceId は null も許容）
+async function resolveLocationResource(body) {
+    const hasResource = Object.prototype.hasOwnProperty.call(body, 'resource_id');
+    const hasLocation = Object.prototype.hasOwnProperty.call(body, 'location_id');
+    let resourceId = hasResource ? (body.resource_id || null) : undefined;
+    let locationId = hasLocation ? (body.location_id || null) : undefined;
+
+    // resource を選択しており、location が明示指定されていない（未送信 or null）場合は home を補完
+    if (resourceId && (locationId == null)) {
+        const { rows } = await db.query(
+            'SELECT home_location_id FROM resources WHERE id = $1',
+            [resourceId]
+        );
+        if (rows[0]?.home_location_id) {
+            locationId = rows[0].home_location_id;
+        }
+    }
+    return {
+        hasLocation: hasLocation || (resourceId != null && locationId != null),
+        hasResource,
+        locationId,
+        resourceId,
+    };
+}
+
 // 案件配下のイベント一覧
 router.get('/', async (req, res, next) => {
     try {
@@ -95,6 +121,9 @@ router.post('/', async (req, res, next) => {
         if (!event_name) {
             return res.status(400).json({ error: 'event_name は必須です。' });
         }
+
+        // location_id / resource_id（resource選択時は home_location を補完）
+        const { locationId, resourceId } = await resolveLocationResource(req.body);
         // カテゴリ未指定時は 'other' を使用
         const eventTypeVal = (event_type && event_type.trim()) ? event_type.trim() : 'other';
 
@@ -109,13 +138,15 @@ router.post('/', async (req, res, next) => {
         const { rows } = await db.query(
             `INSERT INTO project_events
                 (project_id, event_master_id, event_type, event_name, plan_date, actual_date,
-                 status, owner_department, updated_by, is_custom, sort_order, notes)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, TRUE, $10, $11)
+                 status, owner_department, updated_by, is_custom, sort_order, notes,
+                 location_id, resource_id)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, TRUE, $10, $11, $12, $13)
              RETURNING *`,
             [project_id, event_master_id || null, eventTypeVal, event_name,
              plan_date || null, actual_date || null,
              status ?? 'pending', owner_department || null, updated_by || null,
-             nextSortOrder, notes || null]
+             nextSortOrder, notes || null,
+             locationId ?? null, resourceId ?? null]
         );
 
         // 実績日入力時にアラート自動解決
@@ -143,6 +174,10 @@ router.put('/:id', async (req, res, next) => {
                 owner_department, updated_by, notes } = req.body;
         const newActual = actual_date || null;
 
+        // location_id / resource_id（送信時のみ更新。resource選択時は home_location 補完）
+        const { hasLocation, hasResource, locationId, resourceId } =
+            await resolveLocationResource(req.body);
+
         // 3世代シフトロジック:
         //   actual_date が新たに入力される場合のみシフト
         //   prev2 ← prev1, prev1 ← actual_date, actual_date ← 新値
@@ -158,12 +193,15 @@ router.put('/:id', async (req, res, next) => {
                 status           = COALESCE($5, status),
                 owner_department = COALESCE($6, owner_department),
                 updated_by       = COALESCE($7, updated_by),
-                notes            = COALESCE($10, notes)
+                notes            = COALESCE($10, notes),
+                location_id      = CASE WHEN $11::boolean THEN $12::integer ELSE location_id END,
+                resource_id      = CASE WHEN $13::boolean THEN $14::integer ELSE resource_id END
              WHERE id = $8 AND project_id = $9
              RETURNING *`,
             [event_type, event_name, plan_date || null, newActual,
              status, owner_department, updated_by, req.params.id, req.params.project_id,
-             notes || null]
+             notes || null,
+             hasLocation, locationId ?? null, hasResource, resourceId ?? null]
         );
         if (!rows[0]) {
             await client.query('ROLLBACK');

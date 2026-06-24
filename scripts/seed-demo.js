@@ -252,6 +252,15 @@ async function main() {
         const mpRows = (await client.query('SELECT id, pattern_code FROM milestone_pattern')).rows;
         const mpByCode = new Map(mpRows.map((r) => [r.pattern_code, r.id]));
 
+        // resources（schema_v18）。未適用環境では空マップにフォールバックし resource 割当をスキップ
+        let resByCode = new Map();
+        try {
+            const resRows = (await client.query(
+                'SELECT id, resource_code, home_location_id FROM resources')).rows;
+            resByCode = new Map(resRows.map((r) => [r.resource_code, r]));
+        } catch { /* resources 未作成（schema_v18 未適用）→ resource_id は NULL のまま */ }
+        const REVIEW_D = resByCode.get('REVIEW-D') || null;
+
         // 1. パターン3(リピート)/4(EOL) のイベント定義を補完（シーン4成立のため）
         const a3 = await ensurePatternEvents(client, 'PATTERN_3_REPEAT', REPEAT);
         const a4 = await ensurePatternEvents(client, 'PATTERN_4_EOL', EOL);
@@ -329,13 +338,18 @@ async function main() {
                     } else if (isPast) {
                         actual = addDays(plan, p.lateMap[code] || 0); status = 'completed';
                     }
+                    // 設計集中クラスタの KK日（設計系）に REVIEW-D を割当
+                    //   → PIDEMO-06/08/10 が同一日程・同一resourceになり、後続Phaseの重複検出データ状態を作る
+                    const assignReview = p.cluster && code === 'KK_DATE' && REVIEW_D;
+                    const evResourceId = assignReview ? REVIEW_D.id : null;
+                    const evLocationId = assignReview ? (REVIEW_D.home_location_id ?? null) : null;
                     const { rows: [ev] } = await client.query(
                         `INSERT INTO project_events
                             (project_id, event_master_id, event_type, event_name, plan_date, actual_date,
-                             status, owner_department, sort_order, is_custom)
-                         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,FALSE) RETURNING id`,
+                             status, owner_department, sort_order, is_custom, location_id, resource_id)
+                         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,FALSE,$10,$11) RETURNING id`,
                         [projectId, emByCode.get(code) || null, etype, name, plan, actual,
-                         status, `${dept}部門`, so++]);
+                         status, `${dept}部門`, so++, evLocationId, evResourceId]);
                     eventIdByCode[code] = ev.id;
                 }
             }
@@ -438,6 +452,25 @@ async function verify(client) {
     }
     console.log('------------------------------------------------------------------------');
     console.log(`合計 ${rows.length} 件`);
+
+    // 設計集中クラスタの resource 割当確認（後続Phaseの重複検出データ状態）
+    const { rows: rc } = await client.query(`
+        SELECT p.project_no, e.event_name, e.plan_date, r.resource_name, r.capacity
+        FROM project_events e
+        JOIN projects p ON p.id = e.project_id
+        LEFT JOIN resources r ON r.id = e.resource_id
+        WHERE p.project_no LIKE $1 AND e.resource_id IS NOT NULL
+        ORDER BY e.plan_date, p.project_no`, [`${PREFIX}%`]);
+    if (rc.length) {
+        console.log('\n=== resource 割当（重複検出デモ用） ===');
+        for (const r of rc) {
+            console.log(`  ${r.project_no}  ${r.event_name}  ${r.plan_date}  → ${r.resource_name}(capacity ${r.capacity})`);
+        }
+        const byDate = rc.reduce((m, r) => ((m[r.plan_date] = (m[r.plan_date] || 0) + 1), m), {});
+        for (const [d, n] of Object.entries(byDate)) {
+            console.log(`  ※ ${d}: 同一resourceに ${n} 件割当（capacity 2 → ${n > 2 ? '将来Phaseで衝突検出対象' : '範囲内'}）`);
+        }
+    }
 }
 
 main();

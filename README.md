@@ -235,8 +235,18 @@ process-schedule/
 │   └── sql/
 │       └── archive/          # 実行済みSQLアーカイブ
 ├── scripts/                  # ポート管理ユーティリティ
+├── samples/                  # サンプルデータ（Excel）
 └── README.md
 ```
+
+---
+
+## サンプルデータ
+
+`samples/process_insight_sample_data.xlsx` は、案件・マイルストーン・工程の入力イメージを示す **Excel 形式のサンプルデータ** です。
+
+- 動作確認・データ移行の参考用であり、アプリケーションからは直接読み込まれません
+- 実際の画面表示を確認したい場合は、上記「6. デモデータ投入」の `demo_data.sql` を利用してください
 
 ---
 

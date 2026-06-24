@@ -1,7 +1,7 @@
 {
-  "name": "process-schedule-backend",
+  "name": "process-insight-backend",
   "version": "1.0.0",
-  "description": "工程管理システム バックエンド API",
+  "description": "Process Insight バックエンド API",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",

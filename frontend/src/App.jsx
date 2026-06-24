@@ -12,7 +12,7 @@ import MilestonePatternAdmin  from './pages/MilestonePatternAdmin';
 function NavBar() {
     return (
         <nav className="nav-bar">
-            <NavLink to="/projects" className="nav-brand">工程管理</NavLink>
+            <NavLink to="/projects" className="nav-brand">Process Insight</NavLink>
             <div className="nav-links">
                 <NavLink
                     to="/projects"
@@ -80,7 +80,7 @@ function UsernameGate({ children }) {
         <div className="overlay">
             <div className="modal" style={{ width: 380, textAlign: 'center' }}>
                 <div style={{ marginBottom: 6, fontSize: 28 }}>🗓️</div>
-                <h2 className="modal-title" style={{ marginBottom: 8, fontSize: 19 }}>工程管理システム</h2>
+                <h2 className="modal-title" style={{ marginBottom: 8, fontSize: 19 }}>Process Insight</h2>
                 <p style={{ color: 'var(--color-muted)', fontSize: 13, marginBottom: 24, lineHeight: 1.6 }}>
                     編集ロック管理のためユーザー名を入力してください。
                 </p>

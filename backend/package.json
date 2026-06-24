@@ -10,7 +10,8 @@
     "dev:safe": "node ../scripts/kill-port.js 6101 --node-only && nodemon src/index.js",
     "check:ports": "node ../scripts/check-port.js 6101",
     "kill:6101": "node ../scripts/kill-port.js 6101",
-    "db:migrate": "psql -U %DB_USER% -d %DB_NAME% -f src/db/schema.sql"
+    "db:migrate": "psql -U %DB_USER% -d %DB_NAME% -f src/db/schema.sql",
+    "seed:demo": "node ../scripts/seed-demo.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

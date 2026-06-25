@@ -26,6 +26,7 @@ import { reorderEvents }         from '../api/events';
 import { fetchLocations }        from '../api/locations';
 import { fetchResources }        from '../api/resources';
 import EventFormModal            from '../components/EventFormModal';
+import ProcessPlanningReview     from '../components/ProcessPlanningReview';
 import ApplyPatternModal         from '../components/ApplyPatternModal';
 import ProjectInfoCard           from '../components/ProjectInfoCard';
 import AlertBanner               from '../components/AlertBanner';
@@ -296,6 +297,10 @@ export default function ProjectDetail() {
     const { locked, lockedBy, myLock, lockError, acquire, release } = useLock(id);
     const { create, update, remove, loading: eMutating, error: eMutError } = useEventMutations(id, reloadEvents);
 
+    /* ── 工程計画レビュー再評価トリガー（工程変更時に増分） ── */
+    const [reviewKey, setReviewKey] = useState(0);
+    const bumpReview = useCallback(() => setReviewKey((k) => k + 1), []);
+
     /* ── ロケーション / リソース マスタ（工程編集用） ── */
     const [locations, setLocations] = useState([]);
     const [resources, setResources] = useState([]);
@@ -437,13 +442,15 @@ export default function ProjectDetail() {
         }
         setEventModal(null);
         reloadAlerts();
-    }, [eventModal, create, update, reloadAlerts]);
+        bumpReview();
+    }, [eventModal, create, update, reloadAlerts, bumpReview]);
 
     /* ── イベント削除 ── */
     const handleDeleteEvent = useCallback(async (ev) => {
         if (!window.confirm(`「${ev.event_name}」を削除しますか？`)) return;
         await remove(ev.id);
-    }, [remove]);
+        bumpReview();
+    }, [remove, bumpReview]);
 
     /* ── 工程ステップ 展開/折りたたみ ── */
     const toggleStepExpand = useCallback((eventId) => {
@@ -777,6 +784,9 @@ export default function ProjectDetail() {
                     </DndContext>
                 )}
             </div>
+
+            {/* ── 工程計画レビュー ── */}
+            <ProcessPlanningReview projectId={id} refreshKey={reviewKey} />
 
             {/* ── モーダル ── */}
             {eventModal && (

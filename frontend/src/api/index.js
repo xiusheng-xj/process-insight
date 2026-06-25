@@ -4,3 +4,4 @@ export * from './alerts';
 export * from './locks';
 export * from './locations';
 export * from './resources';
+export * from './review';

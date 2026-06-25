@@ -161,4 +161,21 @@ ON CONFLICT (id) DO NOTHING;
 
 SELECT setval('resources_id_seq', GREATEST((SELECT MAX(id) FROM resources), 5));
 
+-- ─────────────────────────────────────────────
+-- 8. review_rules（工程計画レビュー項目カタログ） ※ schema_v20 で追加
+--    RULE-001 のみ有効。002〜008 は将来項目としてカタログ登録（is_enabled=false）。
+-- ─────────────────────────────────────────────
+INSERT INTO review_rules (id, rule_code, rule_name, category, description, is_enabled, sort_order) VALUES
+    (1, 'RULE-001', 'Resource重複',     'resource',  '同一resource・同一日程・同一工程の件数が capacity を超える衝突を検出', true,  10),
+    (2, 'RULE-002', 'Location偏り',     'location',  '拠点（location）への工程集中・偏りを検出（将来）',                    false, 20),
+    (3, 'RULE-003', '工程集中',         'schedule',  '同一時期への工程集中を検出（将来）',                                  false, 30),
+    (4, 'RULE-004', '担当者負荷',       'people',    '担当者・部門の負荷集中を検出（将来）',                                false, 40),
+    (5, 'RULE-005', '納期リスク',       'delivery',  '納期に対する遅延リスクを検出（将来）',                                false, 50),
+    (6, 'RULE-006', '休日・稼働日',     'calendar',  '休日・非稼働日への工程割当を検出（将来）',                            false, 60),
+    (7, 'RULE-007', 'KPI影響',          'kpi',       'KPI Insight 連携による影響評価（将来）',                              false, 70),
+    (8, 'RULE-008', 'SCM/EOL影響',      'scm',       'SCM・EOL 観点の影響評価（将来）',                                    false, 80)
+ON CONFLICT (id) DO NOTHING;
+
+SELECT setval('review_rules_id_seq', GREATEST((SELECT MAX(id) FROM review_rules), 8));
+
 COMMIT;

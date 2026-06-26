@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { generateMilestoneEvents } = require('../services/milestonePattern');
 
 /* ── effective_status 算出 SQL ── */
 const EFFECTIVE_STATUS_SQL = `
@@ -211,28 +212,59 @@ router.get('/:id', async (req, res, next) => {
     }
 });
 
-// 新規作成
+// 新規作成（マイルストーンパターン指定時は同一トランザクションで即適用・イベント生成）
 router.post('/', async (req, res, next) => {
-    try {
-        const { project_no, project_name, owner_name, applied_milestone_pattern_id } = req.body;
-        if (!project_no?.trim())   return res.status(400).json({ error: 'project_no は必須です。' });
-        if (!project_name?.trim()) return res.status(400).json({ error: 'project_name は必須です。' });
-        if (!owner_name?.trim())   return res.status(400).json({ error: 'owner_name は必須です。' });
+    const { project_no, project_name, owner_name, applied_milestone_pattern_id, base_date } = req.body;
+    if (!project_no?.trim())   return res.status(400).json({ error: 'project_no は必須です。' });
+    if (!project_name?.trim()) return res.status(400).json({ error: 'project_name は必須です。' });
+    if (!owner_name?.trim())   return res.status(400).json({ error: 'owner_name は必須です。' });
 
-        const { rows } = await db.query(
+    const patternId = applied_milestone_pattern_id || null;
+    const client = await db.getClient();
+    try {
+        await client.query('BEGIN');
+
+        // パターン指定時は存在・有効性を確認（無効ID指定で案件だけ作られるのを防ぐ）
+        if (patternId) {
+            const { rows: pat } = await client.query(
+                `SELECT id FROM milestone_pattern
+                 WHERE id = $1 AND is_active = TRUE AND deleted_at IS NULL`,
+                [patternId]
+            );
+            if (!pat[0]) {
+                await client.query('ROLLBACK');
+                return res.status(404).json({ error: 'マイルストーンパターンが見つかりません。' });
+            }
+        }
+
+        const { rows } = await client.query(
             `INSERT INTO projects
                 (project_no, project_name, owner_name, applied_milestone_pattern_id, status)
              VALUES ($1, $2, $3, $4, 'active')
              RETURNING *`,
-            [
-                project_no.trim(),
-                project_name.trim(),
-                owner_name.trim(),
-                applied_milestone_pattern_id || null,
-            ]
+            [project_no.trim(), project_name.trim(), owner_name.trim(), patternId]
         );
-        res.status(201).json(rows[0]);
-    } catch (err) { next(err); }
+        const project = rows[0];
+
+        // マイルストーンパターンを即適用して project_events を生成
+        let eventCount = 0;
+        if (patternId) {
+            eventCount = await generateMilestoneEvents(client, {
+                projectId: project.id,
+                patternId,
+                baseDate:  base_date,
+                updatedBy: req.headers['x-user-name'] || owner_name.trim() || 'system',
+            });
+        }
+
+        await client.query('COMMIT');
+        res.status(201).json({ ...project, event_count: eventCount });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        next(err);
+    } finally {
+        client.release();
+    }
 });
 
 // 更新

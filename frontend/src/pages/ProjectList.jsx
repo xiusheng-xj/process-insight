@@ -50,9 +50,11 @@ export default function ProjectList() {
     };
 
     const handleCreate = useCallback(async (body) => {
-        await create(body);
+        const created = await create(body);
         setShowCreate(false);
-    }, [create]);
+        // 作成後は詳細へ遷移（パターン指定時は自動生成済みのイベント一覧が表示される）
+        if (created?.id) navigate(`/projects/${created.id}`);
+    }, [create, navigate]);
 
     const handleDeleteConfirm = useCallback(async (reason) => {
         await remove(deleteTarget.id, reason);

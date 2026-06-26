@@ -97,7 +97,7 @@ export default function CreateProjectModal({ onClose, onSubmit, loading, serverE
                     </div>
 
                     <div className="form-group">
-                        <label className="form-label">フローパターン</label>
+                        <label className="form-label">マイルストーンパターン</label>
                         <select
                             className="form-control"
                             value={form.applied_milestone_pattern_id}

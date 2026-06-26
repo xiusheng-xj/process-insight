@@ -4,6 +4,13 @@
 //       「同一工程種別で数える」方針（確定）。Location は判定対象にしない（将来 Rule-002）。
 //
 // 当該案件の工程が関与する衝突グループのみを抽出し、案件横断の件数で判定する。
+//
+// 【将来拡張の設計余地】
+//   現状は project_events.resource_id を対象に判定する。ユーザーが実際に編集するのは
+//   project_process_steps（schema_v21 で location_id/resource_id を追加済み）であるため、
+//   将来は project_process_steps を UNION して resource 衝突を見られるようにする。
+//   その際は下記クエリの対象テーブルを events/steps の和に拡張し、target_type を
+//   'event' / 'step' で出し分ける（review_findings.target_type は対応済み）。
 
 const { VERDICT, SEVERITY } = require('../verdict');
 

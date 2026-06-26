@@ -7,12 +7,25 @@ import {
 
 const DEPT_LABEL = { A: 'A部門', SELF: '自部門', B: 'B部門', C: 'C部門', D: 'D部門' };
 
-export default function ProcessStepEditModal({ step, projectId, onClose, onSaved }) {
+export default function ProcessStepEditModal({ step, projectId, locations = [], resources = [], onClose, onSaved }) {
     // 基本情報
     const [processName, setProcessName] = useState(step.process_name || '');
     const [deptCode,    setDeptCode]    = useState(step.department_code || '');
     const [planDate,    setPlanDate]    = useState(step.plan_date?.slice(0, 10) || '');
     const [notes,       setNotes]       = useState(step.notes || '');
+    const [locationId,  setLocationId]  = useState(step.location_id != null ? String(step.location_id) : '');
+    const [resourceId,  setResourceId]  = useState(step.resource_id != null ? String(step.resource_id) : '');
+
+    // リソース選択時：ロケーション未設定なら既定ロケーションを自動セット
+    const onResourceChange = (e) => {
+        const rid = e.target.value;
+        setResourceId(rid);
+        const r = resources.find((x) => String(x.id) === rid);
+        if (r && r.home_location_id != null && !locationId) {
+            setLocationId(String(r.home_location_id));
+        }
+    };
+    const selectedResource = resources.find((x) => String(x.id) === resourceId) || null;
 
     // 実績追加
     const [newActualDate,  setNewActualDate]  = useState('');
@@ -37,6 +50,8 @@ export default function ProcessStepEditModal({ step, projectId, onClose, onSaved
                 department_code: deptCode    || null,
                 planned_date:    planDate    || null,
                 note:            notes.trim() || null,
+                location_id:     locationId ? Number(locationId) : null,
+                resource_id:     resourceId ? Number(resourceId) : null,
             });
             onSaved();
         } catch (err) {
@@ -120,6 +135,31 @@ export default function ProcessStepEditModal({ step, projectId, onClose, onSaved
                                         <option key={k} value={k}>{v}</option>
                                     ))}
                                 </select>
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">ロケーション</label>
+                                <select className="form-input" value={locationId} onChange={e => setLocationId(e.target.value)}>
+                                    <option value="">— 未設定 —</option>
+                                    {locations.map((l) => (
+                                        <option key={l.id} value={l.id}>{l.location_name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">リソース/設備</label>
+                                <select className="form-input" value={resourceId} onChange={onResourceChange}>
+                                    <option value="">— 未設定 —</option>
+                                    {resources.map((r) => (
+                                        <option key={r.id} value={r.id}>{r.resource_name}</option>
+                                    ))}
+                                </select>
+                                {selectedResource && (
+                                    <div style={{ marginTop: 6, fontSize: 12, color: '#6b7280' }}>
+                                        既定ロケーション: {selectedResource.home_location_name || '—'}
+                                        ／ capacity: {selectedResource.capacity}
+                                        ／ 部門: {selectedResource.department_code || '—'}
+                                    </div>
+                                )}
                             </div>
                             <div className="form-group">
                                 <label className="form-label">予定日</label>

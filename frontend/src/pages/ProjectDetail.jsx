@@ -860,6 +860,8 @@ export default function ProjectDetail() {
                 <ProcessStepEditModal
                     step={editStepModal}
                     projectId={id}
+                    locations={locations}
+                    resources={resources}
                     onClose={() => setEditStepModal(null)}
                     onSaved={handleSaveStep}
                 />

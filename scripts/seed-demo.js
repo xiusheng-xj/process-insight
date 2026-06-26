@@ -366,18 +366,22 @@ async function main() {
             if (p.cluster && eventIdByCode['KK_DATE']) {
                 const kkOff = TEMPLATES[p.template].find((e) => e[0] === 'KK_DATE')[4];
                 const kkPlan = addDays(today, p.base + kkOff);
+                // 設計レビュー工程に REVIEW-D（capacity 2）を割当 → 3案件が同一日程・同一resource
+                //   になり、工程ステップ側でも重複検出デモ用のデータ状態を作る（schema_v21）
                 const steps = [
-                    ['構想設計',   -3, 1],
-                    ['詳細設計',    0, 2],
-                    ['設計レビュー', 3, 3],
+                    ['構想設計',   -3, 1, false],
+                    ['詳細設計',    0, 2, false],
+                    ['設計レビュー', 3, 3, true],   // ← REVIEW-D を割当
                 ];
-                for (const [sname, soff, sorder] of steps) {
+                for (const [sname, soff, sorder, useReview] of steps) {
+                    const resId = (useReview && REVIEW_D) ? REVIEW_D.id : null;
+                    const locId = (useReview && REVIEW_D) ? (REVIEW_D.home_location_id ?? null) : null;
                     await client.query(
                         `INSERT INTO project_process_steps
                             (project_id, parent_event_id, process_name, department_code, plan_date,
-                             sort_order, offset_days, offset_base, source, is_custom)
-                         VALUES ($1,$2,$3,'C',$4,$5,$6,'parent_event','demo',TRUE)`,
-                        [projectId, eventIdByCode['KK_DATE'], sname, addDays(kkPlan, soff), sorder, soff]);
+                             sort_order, offset_days, offset_base, source, is_custom, location_id, resource_id)
+                         VALUES ($1,$2,$3,'C',$4,$5,$6,'parent_event','demo',TRUE,$7,$8)`,
+                        [projectId, eventIdByCode['KK_DATE'], sname, addDays(kkPlan, soff), sorder, soff, locId, resId]);
                 }
             }
 

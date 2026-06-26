@@ -8,7 +8,7 @@ const DEPT_LABEL = { A: 'A部門', SELF: '自部門', B: 'B部門', C: 'C部門'
  * tab="apply"  → パターン選択して適用
  * tab="custom" → 任意ステップを個別追加
  */
-export default function ProcessStepModal({ projectId, event, onClose, onApplied, onAdded, initialTab = 'apply' }) {
+export default function ProcessStepModal({ projectId, event, locations = [], resources = [], onClose, onApplied, onAdded, initialTab = 'apply' }) {
     const [tab, setTab]             = useState(initialTab);
     const [patterns, setPatterns]   = useState([]);
     const [loadingP, setLoadingP]   = useState(true);
@@ -24,8 +24,21 @@ export default function ProcessStepModal({ projectId, event, onClose, onApplied,
     const [offsetDays, setOffsetDays]     = useState(0);
     const [plannedDate, setPlannedDate]   = useState('');
     const [note, setNote]                 = useState('');
+    const [locationId, setLocationId]     = useState('');
+    const [resourceId, setResourceId]     = useState('');
     const [adding, setAdding]             = useState(false);
     const [addErr, setAddErr]             = useState('');
+
+    // リソース選択時：ロケーション未設定なら既定ロケーションを自動セット
+    const onResourceChange = (e) => {
+        const rid = e.target.value;
+        setResourceId(rid);
+        const r = resources.find((x) => String(x.id) === rid);
+        if (r && r.home_location_id != null && !locationId) {
+            setLocationId(String(r.home_location_id));
+        }
+    };
+    const selectedResource = resources.find((x) => String(x.id) === resourceId) || null;
 
     useEffect(() => {
         fetchProcessPatterns()
@@ -69,9 +82,12 @@ export default function ProcessStepModal({ projectId, event, onClose, onApplied,
                 offset_days:     Number(offsetDays) || 0,
                 planned_date:    plannedDate || null,
                 note:            note.trim() || null,
+                location_id:     locationId ? Number(locationId) : null,
+                resource_id:     resourceId ? Number(resourceId) : null,
             });
             onAdded(step);
             setProcessName(''); setDeptCode(''); setOffsetDays(0); setPlannedDate(''); setNote('');
+            setLocationId(''); setResourceId('');
         } catch (err) {
             setAddErr(err.data?.message || err.message || '追加に失敗しました。');
         } finally {
@@ -221,6 +237,33 @@ export default function ProcessStepModal({ projectId, event, onClose, onApplied,
                                     ))}
                                 </select>
                             </div>
+                            <div style={{ display: 'flex', gap: 12 }}>
+                                <div className="form-group" style={{ flex: 1 }}>
+                                    <label className="form-label">ロケーション</label>
+                                    <select className="form-input" value={locationId} onChange={e => setLocationId(e.target.value)}>
+                                        <option value="">— 未設定 —</option>
+                                        {locations.map((l) => (
+                                            <option key={l.id} value={l.id}>{l.location_name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="form-group" style={{ flex: 1 }}>
+                                    <label className="form-label">リソース/設備</label>
+                                    <select className="form-input" value={resourceId} onChange={onResourceChange}>
+                                        <option value="">— 未設定 —</option>
+                                        {resources.map((r) => (
+                                            <option key={r.id} value={r.id}>{r.resource_name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                            {selectedResource && (
+                                <div style={{ marginTop: -6, marginBottom: 14, fontSize: 12, color: '#6b7280' }}>
+                                    既定ロケーション: {selectedResource.home_location_name || '—'}
+                                    ／ capacity: {selectedResource.capacity}
+                                    ／ 部門: {selectedResource.department_code || '—'}
+                                </div>
+                            )}
                             <div style={{ display: 'flex', gap: 12 }}>
                                 <div className="form-group" style={{ flex: 1 }}>
                                     <label className="form-label">オフセット日数</label>

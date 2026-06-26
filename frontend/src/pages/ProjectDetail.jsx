@@ -107,6 +107,12 @@ function ProcessStepSubRow({ step, editMode, onDelete, onEdit }) {
                         カスタム
                     </span>
                 )}
+                {(step.location_name || step.resource_name) && (
+                    <div style={{ marginTop: 2, fontSize: 10.5, color: 'var(--color-muted)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {step.location_name && <span>📍 {step.location_name}</span>}
+                        {step.resource_name && <span>🔧 {step.resource_name}</span>}
+                    </div>
+                )}
             </td>
             {/* 担当部門 */}
             <td style={{ ...cell, color: 'var(--color-muted)' }}>
@@ -841,6 +847,8 @@ export default function ProjectDetail() {
                 <ProcessStepModal
                     projectId={id}
                     event={processStepModal.event}
+                    locations={locations}
+                    resources={resources}
                     initialTab={processStepModal.initialTab || 'apply'}
                     onClose={() => setProcessStepModal(null)}
                     onApplied={() => { loadProcessSteps(); setProcessStepModal(null); }}

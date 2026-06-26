@@ -2,6 +2,7 @@ const express = require('express');
 const router  = express.Router({ mergeParams: true });
 const db      = require('../db');
 const { resolveLocationResource } = require('../services/locationResource');
+const { computeStepConflicts } = require('../services/resourceConflicts');
 
 // GET /projects/:projectId/process-steps
 // 実績履歴テーブルから latest/previous/pre_previous + diff_days + step_status を算出
@@ -55,7 +56,14 @@ router.get('/', async (req, res, next) => {
             ORDER BY pps.parent_event_id, pps.sort_order`,
             params
         );
-        res.json(rows);
+
+        // Resource重複（キャパ超過）を案件横断で算出し、該当ステップに付与
+        const stConf = await computeStepConflicts();
+        const enriched = rows.map((s) => {
+            const c = stConf.byId.get(s.id);
+            return c ? { ...s, is_conflict: true, conflict: c } : s;
+        });
+        res.json(enriched);
     } catch (err) {
         next(err);
     }

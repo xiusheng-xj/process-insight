@@ -306,6 +306,7 @@ export default function ProjectDetail() {
     /* ── 工程計画レビュー再評価トリガー（工程変更時に増分） ── */
     const [reviewKey, setReviewKey] = useState(0);
     const bumpReview = useCallback(() => setReviewKey((k) => k + 1), []);
+    const [reviewSummary, setReviewSummary] = useState(null);
 
     /* ── ロケーション / リソース マスタ（工程編集用） ── */
     const [locations, setLocations] = useState([]);
@@ -558,6 +559,21 @@ export default function ProjectDetail() {
                 <AlertBanner alerts={alerts} onResolve={resolveAlert} />
             )}
 
+            {/* ── 工程計画レビュー アラート（要調整時） ── */}
+            {reviewSummary?.overall_verdict === 'adjust' && (
+                <div style={{
+                    display: 'flex', alignItems: 'flex-start', gap: 10,
+                    background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8,
+                    padding: '12px 16px', marginBottom: 14,
+                }}>
+                    <span style={{ fontSize: 18, lineHeight: 1, color: '#dc2626' }}>⚠</span>
+                    <div style={{ fontSize: 13, color: '#b91c1c', lineHeight: 1.7 }}>
+                        <div style={{ fontWeight: 700 }}>工程計画レビュー：Resource重複があります</div>
+                        {(reviewSummary.guidance || []).map((g, i) => <div key={i}>{g}</div>)}
+                    </div>
+                </div>
+            )}
+
             {/* ── 案件情報 ── */}
             <ProjectInfoCard
                 project={project}
@@ -797,7 +813,7 @@ export default function ProjectDetail() {
             </div>
 
             {/* ── 工程計画レビュー ── */}
-            <ProcessPlanningReview projectId={id} refreshKey={reviewKey} />
+            <ProcessPlanningReview projectId={id} refreshKey={reviewKey} onReview={setReviewSummary} />
 
             {/* ── モーダル ── */}
             {eventModal && (

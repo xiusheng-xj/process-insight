@@ -9,7 +9,7 @@ const VERDICT = {
 };
 const vmeta = (v) => VERDICT[v] || VERDICT.ok;
 
-export default function ProcessPlanningReview({ projectId, refreshKey = 0 }) {
+export default function ProcessPlanningReview({ projectId, refreshKey = 0, onReview }) {
     const [review, setReview]   = useState(null);
     const [rules,  setRules]    = useState([]);
     const [loading, setLoading] = useState(true);
@@ -26,12 +26,13 @@ export default function ProcessPlanningReview({ projectId, refreshKey = 0 }) {
             ]);
             setReview(rv);
             setRules(rl);
+            onReview?.(rv);  // 親（案件詳細）へレビュー結果を通知（上部アラート用）
         } catch (e) {
             setError(e.message || 'レビューの取得に失敗しました。');
         } finally {
             setLoading(false);
         }
-    }, [projectId]);
+    }, [projectId, onReview]);
 
     useEffect(() => { load(); }, [load, refreshKey]);
 

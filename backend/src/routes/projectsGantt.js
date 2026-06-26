@@ -1,6 +1,21 @@
 const express = require('express');
 const router  = express.Router();
 const db      = require('../db');
+const { computeEventConflicts, computeStepConflicts } = require('../services/resourceConflicts');
+
+// 衝突詳細配列 → 案件単位のサマリ（重複排除）と確認喚起文を作る
+function summarizeConflicts(details) {
+    const seen = new Set();
+    const conflicts = [];
+    const depts = new Set();
+    for (const d of details) {
+        const key = `${d.resource_name}|${d.plan_date}`;
+        if (!seen.has(key)) { seen.add(key); conflicts.push(d); }
+        if (d.department_code) depts.add(d.department_code);
+    }
+    const guidance = [...depts].map((dep) => `${dep}部門と日程確認を行ってください。`);
+    return { conflicts, guidance };
+}
 
 /* ── Shared SQL (mirrors projects.js exactly) ── */
 const EFFECTIVE_STATUS_SQL = `
@@ -134,6 +149,10 @@ router.get('/', async (req, res, next) => {
             ? rows.filter(r => r.health_status === health_status)
             : rows;
 
+        /* 工程計画レビュー（Resource重複）を案件横断で一括算出 */
+        const evConf = await computeEventConflicts();
+        const stConf = await computeStepConflicts();
+
         /* 全案件の計画期間から date_range を算出 */
         let minDate = null;
         let maxDate = null;
@@ -145,14 +164,32 @@ router.get('/', async (req, res, next) => {
         }
 
         res.json({
-            data: filtered.map(r => ({
-                ...r,
-                plan_start:    r.plan_start    ? String(r.plan_start).slice(0, 10)    : null,
-                plan_end:      r.plan_end      ? String(r.plan_end).slice(0, 10)      : null,
-                actual_start:  r.actual_start  ? String(r.actual_start).slice(0, 10)  : null,
-                actual_latest: r.actual_latest ? String(r.actual_latest).slice(0, 10) : null,
-                milestones: r.milestones || [],
-            })),
+            data: filtered.map(r => {
+                // マイルストーン（イベント）に衝突フラグを付与
+                const milestones = (r.milestones || []).map((m) => {
+                    const c = evConf.byId.get(m.id);
+                    return c ? { ...m, is_conflict: true, conflict: c } : m;
+                });
+                // 案件単位の衝突サマリ（イベント＋ステップ）
+                const details = [
+                    ...(evConf.byProject.get(r.id) || []),
+                    ...(stConf.byProject.get(r.id) || []),
+                ];
+                const reviewVerdict = details.length > 0 ? 'adjust' : 'ok';
+                const { conflicts, guidance } = summarizeConflicts(details);
+
+                return {
+                    ...r,
+                    plan_start:    r.plan_start    ? String(r.plan_start).slice(0, 10)    : null,
+                    plan_end:      r.plan_end      ? String(r.plan_end).slice(0, 10)      : null,
+                    actual_start:  r.actual_start  ? String(r.actual_start).slice(0, 10)  : null,
+                    actual_latest: r.actual_latest ? String(r.actual_latest).slice(0, 10) : null,
+                    milestones,
+                    review_verdict:   reviewVerdict,
+                    review_conflicts: conflicts,
+                    review_guidance:  guidance,
+                };
+            }),
             total: filtered.length,
             date_range: { min_date: minDate, max_date: maxDate },
         });

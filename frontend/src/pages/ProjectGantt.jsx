@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchProjectsGantt } from '../api/projects';
+import { fetchProjectProcessSteps } from '../api/processPatterns';
 
 /* ── Scale configuration ── */
 const SCALE_CFG = {
@@ -12,6 +13,7 @@ const SCALE_LABEL = { month: '月', week: '週', day: '日' };
 
 /* ── Layout constants ── */
 const ROW_H    = 80;
+const SUB_ROW_H = 28;   // ドリルダウン（イベント / 工程ステップ）行の高さ
 const LEFT_W   = 224;
 const HEADER_H = 34;
 const PAD_X    = 20;
@@ -150,6 +152,113 @@ function MilestoneTooltip({ m }) {
             {overdueDays != null && (
                 <div style={{ color: '#fca5a5', marginTop: 2 }}>⚠ {overdueDays} 日超過</div>
             )}
+        </div>
+    );
+}
+
+function ConflictTooltip({ c }) {
+    return (
+        <div>
+            <div style={{ fontWeight: 600, color: '#fca5a5', marginBottom: 3 }}>⚠ Resource重複</div>
+            <div>{fmtJP(c.plan_date)}</div>
+            <div>{c.resource_name}</div>
+            <div>{c.count} 件 / capacity {c.capacity}</div>
+            <div style={{ color: '#fca5a5', marginTop: 2 }}>{c.department_code}部門と日程確認を行ってください。</div>
+        </div>
+    );
+}
+
+/* ── 共通: サブ行の罫線＋今日線 ── */
+function SubRowGrid({ headers, todayX }) {
+    return (
+        <>
+            {headers.map((h, i) => (
+                <div key={i} style={{ position: 'absolute', top: 0, bottom: 0, left: h.x, width: 1, background: 'var(--color-border-light)', pointerEvents: 'none' }} />
+            ))}
+            {todayX != null && (
+                <div style={{ position: 'absolute', top: 0, bottom: 0, left: todayX, width: 2, background: '#ef4444', opacity: 0.4, pointerEvents: 'none' }} />
+            )}
+        </>
+    );
+}
+
+/* ── イベント（マイルストーン）サブ行 ── */
+function EventSubRow({ m, minDate, dayW, todayX, headers, hasSteps, isStepsOpen, onToggleSteps, onTip, onMove, onHide }) {
+    const px = dateToX(m.plan_date, minDate, dayW);
+    const ax = m.actual_date ? dateToX(m.actual_date, minDate, dayW) : null;
+    const conflict = !!m.is_conflict;
+    const cy = SUB_ROW_H / 2;
+    const diamondColor = conflict ? '#dc2626' : (m.is_overdue ? '#ef4444' : '#6b7280');
+    const evTip = conflict ? <ConflictTooltip c={m.conflict} /> : <MilestoneTooltip m={m} />;
+    return (
+        <div style={{ display: 'flex', height: SUB_ROW_H, borderBottom: '1px solid var(--color-border-light)' }}>
+            <div style={{ width: LEFT_W, flexShrink: 0, position: 'sticky', left: 0, zIndex: 10, background: conflict ? '#fef2f2' : '#f8fafc', borderRight: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 18, fontSize: 11 }}>
+                <span style={{ color: '#93c5fd' }}>└</span>
+                {conflict && <span style={{ color: '#dc2626' }}>⚠</span>}
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: conflict ? '#b91c1c' : 'var(--color-text)' }}>{m.event_name}</span>
+                {hasSteps && (
+                    <button onClick={(e) => { e.stopPropagation(); onToggleSteps(); }} style={{ marginLeft: 'auto', marginRight: 8, fontSize: 9, border: '1px solid #d1d5db', borderRadius: 3, background: 'none', cursor: 'pointer', color: '#6b7280', padding: '0 4px' }}>
+                        {isStepsOpen ? '▼' : '▶'} 工程
+                    </button>
+                )}
+            </div>
+            <div style={{ flex: 1, position: 'relative', background: conflict ? '#fef2f2' : undefined }}>
+                <SubRowGrid headers={headers} todayX={todayX} />
+                {px != null && (
+                    <div
+                        style={{ position: 'absolute', left: px - DIAMOND, top: cy - DIAMOND, width: DIAMOND * 2, height: DIAMOND * 2, background: diamondColor, transform: 'rotate(45deg)', zIndex: 5, boxShadow: conflict ? '0 0 0 2px #fecaca' : undefined }}
+                        onMouseEnter={e => onTip(e, evTip)}
+                        onMouseMove={onMove}
+                        onMouseLeave={onHide}
+                    />
+                )}
+                {ax != null && m.is_completed && (
+                    <div style={{ position: 'absolute', left: ax - DOT_R, top: cy - DOT_R, width: DOT_R * 2, height: DOT_R * 2, background: '#3b82f6', borderRadius: '50%', border: '1.5px solid #fff', zIndex: 5 }} />
+                )}
+            </div>
+        </div>
+    );
+}
+
+/* ── 工程ステップ サブ行 ── */
+function StepSubRow({ s, minDate, dayW, todayX, headers, onTip, onMove, onHide }) {
+    const px = dateToX(s.plan_date, minDate, dayW);
+    const ax = s.latest_actual_date ? dateToX(s.latest_actual_date, minDate, dayW) : null;
+    const conflict = !!s.is_conflict;
+    const cy = SUB_ROW_H / 2;
+    const meta = [s.location_name && `📍${s.location_name}`, s.resource_name && `🔧${s.resource_name}`].filter(Boolean).join(' ');
+    const stepTip = conflict
+        ? <ConflictTooltip c={s.conflict} />
+        : (
+            <div>
+                <div style={{ fontWeight: 600 }}>{s.process_name}</div>
+                <div>予定: {fmtJP(s.plan_date)}</div>
+                {meta && <div>{meta}</div>}
+            </div>
+        );
+    return (
+        <div style={{ display: 'flex', height: SUB_ROW_H, borderBottom: '1px solid var(--color-border-light)' }}>
+            <div style={{ width: LEFT_W, flexShrink: 0, position: 'sticky', left: 0, zIndex: 10, background: conflict ? '#fef2f2' : '#eff6ff', borderRight: conflict ? '2px solid #dc2626' : '1px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 30, fontSize: 10.5 }}>
+                <span style={{ color: '#bfdbfe' }}>└</span>
+                {conflict && <span style={{ color: '#dc2626' }}>⚠</span>}
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: conflict ? '#b91c1c' : 'var(--color-muted)' }}>
+                    {s.process_name}{meta && <span style={{ color: 'var(--color-subtle)' }}>　{meta}</span>}
+                </span>
+            </div>
+            <div style={{ flex: 1, position: 'relative', background: conflict ? '#fef2f2' : '#f0f9ff' }}>
+                <SubRowGrid headers={headers} todayX={todayX} />
+                {px != null && (
+                    <div
+                        style={{ position: 'absolute', left: px - 4, top: cy - 4, width: 8, height: 8, background: conflict ? '#dc2626' : '#9ca3af', transform: 'rotate(45deg)', zIndex: 5, boxShadow: conflict ? '0 0 0 2px #fecaca' : undefined }}
+                        onMouseEnter={e => onTip(e, stepTip)}
+                        onMouseMove={onMove}
+                        onMouseLeave={onHide}
+                    />
+                )}
+                {ax != null && (
+                    <div style={{ position: 'absolute', left: ax - 4, top: cy - 4, width: 8, height: 8, background: '#3b82f6', borderRadius: '50%', border: '1.5px solid #fff', zIndex: 5 }} />
+                )}
+            </div>
         </div>
     );
 }
@@ -331,6 +440,36 @@ export default function ProjectGantt() {
     }, []);
     const hideTooltip = useCallback(() => setTooltip(null), []);
 
+    /* ── ドリルダウン展開 ── */
+    const [expandedProjects, setExpandedProjects] = useState(new Set());
+    const [expandedEvents,   setExpandedEvents]   = useState(new Set()); // `${pid}:${eid}`
+    const [stepsByProject,   setStepsByProject]   = useState({});        // pid -> steps[]
+
+    const toggleProject = useCallback((pid) => {
+        setExpandedProjects(prev => {
+            const s = new Set(prev);
+            s.has(pid) ? s.delete(pid) : s.add(pid);
+            return s;
+        });
+        // 初回展開時に工程ステップを取得（任意展開・オンデマンド）
+        setStepsByProject(prev => {
+            if (prev[pid] !== undefined) return prev;
+            fetchProjectProcessSteps(pid)
+                .then(steps => setStepsByProject(p2 => ({ ...p2, [pid]: steps })))
+                .catch(() => setStepsByProject(p2 => ({ ...p2, [pid]: [] })));
+            return { ...prev, [pid]: undefined };
+        });
+    }, []);
+
+    const toggleEvent = useCallback((pid, eid) => {
+        setExpandedEvents(prev => {
+            const k = `${pid}:${eid}`;
+            const s = new Set(prev);
+            s.has(k) ? s.delete(k) : s.add(k);
+            return s;
+        });
+    }, []);
+
     const handleSearch = (e) => {
         e.preventDefault();
         setSearch(searchInput.trim());
@@ -426,30 +565,55 @@ export default function ProjectGantt() {
                                     const healthCls = p.effective_status === 'completed' ? 'health-completed'
                                         : { healthy: 'health-healthy', caution: 'health-caution', danger: 'health-danger' }[p.health_status] || '';
 
+                                    const isAdjust   = p.review_verdict === 'adjust';
+                                    const isExpanded = expandedProjects.has(p.id);
+                                    const stripColor = isAdjust ? 'var(--color-danger)' : borderColor;
+                                    const steps      = stepsByProject[p.id];   // undefined=loading, []=none
+                                    const stepsByEvent = {};
+                                    if (Array.isArray(steps)) {
+                                        for (const s of steps) {
+                                            if (!stepsByEvent[s.parent_event_id]) stepsByEvent[s.parent_event_id] = [];
+                                            stepsByEvent[s.parent_event_id].push(s);
+                                        }
+                                    }
+
                                     return (
-                                        <div key={p.id} style={{ display: 'flex', height: ROW_H, borderBottom: '1px solid var(--color-border-light)' }}>
+                                        <Fragment key={p.id}>
+                                        <div style={{ display: 'flex', height: ROW_H, borderBottom: '1px solid var(--color-border-light)' }}>
                                             {/* Left panel — sticky */}
                                             <div
                                                 className="gantt-left-row"
-                                                style={{ width: LEFT_W, flexShrink: 0, position: 'sticky', left: 0, zIndex: 10, background: 'var(--color-card)', borderRight: '1px solid var(--color-border)', display: 'flex', cursor: 'pointer' }}
+                                                style={{ width: LEFT_W, flexShrink: 0, position: 'sticky', left: 0, zIndex: 10, background: isAdjust ? '#fff5f5' : 'var(--color-card)', borderRight: '1px solid var(--color-border)', display: 'flex', cursor: 'pointer' }}
                                                 onClick={() => navigate(`/projects/${p.id}`)}
                                                 onMouseEnter={e => showTooltip(e, <ProjectTooltip p={p} />)}
                                                 onMouseMove={moveTooltip}
                                                 onMouseLeave={hideTooltip}
                                             >
+                                                {/* Drill-down toggle */}
+                                                <div
+                                                    onClick={e => { e.stopPropagation(); toggleProject(p.id); }}
+                                                    title="イベント / 工程ステップを展開"
+                                                    style={{ width: 18, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#9ca3af', fontSize: 10 }}
+                                                >
+                                                    {isExpanded ? '▼' : '▶'}
+                                                </div>
                                                 {/* Health indicator strip */}
-                                                <div style={{ width: 3, flexShrink: 0, background: borderColor }} />
+                                                <div style={{ width: 3, flexShrink: 0, background: stripColor }} />
                                                 <div style={{ flex: 1, padding: '8px 10px', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                                                     <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                        {isAdjust && <span style={{ color: '#dc2626', marginRight: 3 }}>⚠</span>}
                                                         {p.project_name}
                                                     </div>
                                                     <div style={{ fontSize: 10.5, color: 'var(--color-subtle)', marginBottom: 5, fontFamily: 'var(--font-mono)' }}>{p.project_no}</div>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                                                        <div className="progress-bar-wrap" style={{ width: 60 }}>
+                                                        <div className="progress-bar-wrap" style={{ width: 50 }}>
                                                             <div className="progress-bar-fill" style={{ width: `${pct}%`, background: hc }} />
                                                         </div>
                                                         <span style={{ fontSize: 10, color: 'var(--color-muted)' }}>{pct}%</span>
                                                         <span className={`health-badge ${healthCls}`}>{hl}</span>
+                                                        {isAdjust && (
+                                                            <span style={{ fontSize: 9.5, fontWeight: 700, color: '#fff', background: '#dc2626', borderRadius: 9999, padding: '1px 6px' }}>要調整</span>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
@@ -467,6 +631,30 @@ export default function ProjectGantt() {
                                                 onNavigate={() => navigate(`/projects/${p.id}`)}
                                             />
                                         </div>
+
+                                        {/* ドリルダウン: イベント → 工程ステップ */}
+                                        {isExpanded && (p.milestones || []).filter(m => m.plan_date).map(m => {
+                                            const evSteps = stepsByEvent[m.id] || [];
+                                            const evOpen  = expandedEvents.has(`${p.id}:${m.id}`);
+                                            return (
+                                                <Fragment key={`ev-${m.id}`}>
+                                                    <EventSubRow
+                                                        m={m} minDate={minDate} dayW={dayW} todayX={todayX} headers={headers}
+                                                        hasSteps={evSteps.length > 0} isStepsOpen={evOpen}
+                                                        onToggleSteps={() => toggleEvent(p.id, m.id)}
+                                                        onTip={showTooltip} onMove={moveTooltip} onHide={hideTooltip}
+                                                    />
+                                                    {evOpen && evSteps.map(s => (
+                                                        <StepSubRow
+                                                            key={`st-${s.id}`} s={s}
+                                                            minDate={minDate} dayW={dayW} todayX={todayX} headers={headers}
+                                                            onTip={showTooltip} onMove={moveTooltip} onHide={hideTooltip}
+                                                        />
+                                                    ))}
+                                                </Fragment>
+                                            );
+                                        })}
+                                        </Fragment>
                                     );
                                 })
                             )}

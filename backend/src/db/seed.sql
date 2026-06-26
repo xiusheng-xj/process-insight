@@ -95,7 +95,35 @@ VALUES
     (69, 2, 52, 13, 135, 'project_start', true,  true)    -- 確認日 ★MS
 ON CONFLICT (id) DO NOTHING;
 
+-- pattern3/4 を採番付きで追加する前に、採番を pattern1/2 の最大IDへ合わせる
 SELECT setval('template_events_id_seq', GREATEST((SELECT MAX(id) FROM milestone_pattern_events), 69));
+
+-- パターン3（リピート品）: 6イベント
+--   id は自動採番。(pattern_id, event_master_id) で冪等化（seed-demo 由来の既存行とも衝突しない）
+INSERT INTO milestone_pattern_events
+    (pattern_id, event_master_id, sort_order, offset_days, offset_base, is_milestone, is_required)
+VALUES
+    (3, 53, 1,   0, 'project_start', false, true),   -- 日程表A
+    (3, 26, 2,   7, 'project_start', true,  true),   -- KK日 ★MS
+    (3, 39, 3,  10, 'project_start', false, true),   -- 全体会議①
+    (3, 45, 4,  40, 'project_start', false, true),   -- 対応完了日(B)
+    (3, 57, 5,  55, 'project_start', true,  true),   -- 納期(B) ★MS
+    (3, 52, 6,  60, 'project_start', true,  true)    -- 確認日 ★MS
+ON CONFLICT (pattern_id, event_master_id) DO NOTHING;
+
+-- パターン4（EOL対応）: 6イベント
+INSERT INTO milestone_pattern_events
+    (pattern_id, event_master_id, sort_order, offset_days, offset_base, is_milestone, is_required)
+VALUES
+    (4, 53, 1,   0, 'project_start', false, true),   -- 日程表A
+    (4, 39, 2,  14, 'project_start', false, true),   -- 全体会議①
+    (4, 26, 3,  20, 'project_start', true,  true),   -- KK日 ★MS
+    (4, 45, 4,  45, 'project_start', false, true),   -- 対応完了日(B)
+    (4, 57, 5,  80, 'project_start', true,  true),   -- 納期(B) ★MS
+    (4, 52, 6, 100, 'project_start', true,  true)    -- 確認日 ★MS
+ON CONFLICT (pattern_id, event_master_id) DO NOTHING;
+
+SELECT setval('template_events_id_seq', GREATEST((SELECT MAX(id) FROM milestone_pattern_events), 81));
 
 -- ─────────────────────────────────────────────
 -- 4. process_pattern

@@ -599,7 +599,12 @@ export default function ProjectDetail() {
                                 パターン未適用
                             </div>
                         )}
-                        {applyResult && (
+                        {applyResult && applyResult.generated === 0 && (
+                            <div style={{ fontSize: 12, color: 'var(--color-danger)', marginTop: 3 }}>
+                                ⚠ このパターンには工程が登録されていないため、イベントは生成されませんでした。
+                            </div>
+                        )}
+                        {applyResult && applyResult.generated > 0 && (
                             <div style={{ fontSize: 12, color: 'var(--color-success)', marginTop: 3 }}>
                                 ✓ 適用完了 — {applyResult.generated} 件生成
                                 {applyResult.carried    > 0 && ` / ${applyResult.carried} 件引き継ぎ`}

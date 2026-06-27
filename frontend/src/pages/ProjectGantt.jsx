@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, Fragment } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, useLayoutEffect, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchProjectsGantt } from '../api/projects';
 import { fetchProjectProcessSteps } from '../api/processPatterns';
@@ -387,6 +387,10 @@ export default function ProjectGantt() {
     const [scale,       setScale]       = useState('month');
     const [tooltip,     setTooltip]     = useState(null);
 
+    /* スクロールコンテナと、モード切替時に中央へ戻す「表示中心日付」 */
+    const containerRef   = useRef(null);
+    const pendingViewRef = useRef(null);   // { date, top }
+
     const load = useCallback(async (params) => {
         setLoading(true);
         setError(null);
@@ -430,6 +434,31 @@ export default function ProjectGantt() {
 
         return { minDate: minStr, ganttW: w, headers: hdrs, todayX: tx, dayW: dW };
     }, [dateRange, scale]);
+
+    /* ── モード切替: 表示中心日付（と縦スクロール）を保持 ── */
+    // 可視ガント領域（左パネル LEFT_W を除く）の中心が指す日付を維持する
+    const changeScale = useCallback((next) => {
+        const el = containerRef.current;
+        if (el && minDate) {
+            const d = (el.scrollLeft + (el.clientWidth - LEFT_W) / 2 - PAD_X) / dayW;
+            const dt = new Date(minDate);
+            dt.setDate(dt.getDate() + Math.round(d));
+            pendingViewRef.current = { date: dt.toISOString().slice(0, 10), top: el.scrollTop };
+        }
+        setScale(next);
+    }, [minDate, dayW]);
+
+    // 再描画（新しい dayW / ganttW）後に、保持した中心日付が中央へ来るようスクロール
+    useLayoutEffect(() => {
+        const el = containerRef.current;
+        const pv = pendingViewRef.current;
+        if (el && pv && minDate) {
+            const d = dayDiff(minDate, pv.date);
+            el.scrollLeft = PAD_X + d * dayW - (el.clientWidth - LEFT_W) / 2;
+            el.scrollTop  = pv.top;          // 縦スクロール位置も復元
+            pendingViewRef.current = null;
+        }
+    }, [scale, dayW, ganttW, minDate]);
 
     /* tooltip helpers */
     const showTooltip = useCallback((e, content) => {
@@ -491,7 +520,7 @@ export default function ProjectGantt() {
                             <button
                                 key={s}
                                 className={`gantt-scale-btn${scale === s ? ' active' : ''}`}
-                                onClick={() => setScale(s)}
+                                onClick={() => changeScale(s)}
                             >
                                 {SCALE_LABEL[s]}
                             </button>
@@ -521,7 +550,7 @@ export default function ProjectGantt() {
 
             {/* Gantt table */}
             {!loading && !error && (
-                <div className="gantt-container" style={{ flex: 1, overflow: 'auto', marginBottom: 16 }}>
+                <div ref={containerRef} className="gantt-container" style={{ flex: 1, overflow: 'auto', marginBottom: 16 }}>
                     {!minDate ? (
                         <div className="empty-state">表示できる案件がありません</div>
                     ) : (
